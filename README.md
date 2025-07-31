@@ -1,46 +1,247 @@
-# Getting Started with Create React App
+# HTPI Admin Portal
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Administrative portal for managing the HTPI healthcare insurance claim processing system.
 
-## Available Scripts
+## Overview
 
-In the project directory, you can run:
+The HTPI Admin Portal provides system administrators with comprehensive tools to:
 
-### `npm start`
+- Manage organizations and their settings
+- Monitor system health and performance
+- Review audit logs and security events
+- Manage admin users and permissions
+- View detailed analytics and reports
+- Handle billing and subscription management
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+## Features
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+- **Multi-level Admin Roles**: Super admin, org admin, billing admin, etc.
+- **Real-time Dashboard**: System metrics and health monitoring
+- **Organization Management**: Create, edit, suspend organizations
+- **User Management**: Manage users across all organizations
+- **Audit Trail**: Complete audit logging of all admin actions
+- **Billing Management**: Handle plans, limits, and usage
+- **System Monitoring**: Service health and performance metrics
 
-### `npm test`
+## Tech Stack
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- React 18 with TypeScript
+- Material-UI v5 for UI components
+- React Query for data fetching
+- React Router v6 for navigation
+- Recharts for data visualization
+- Axios for API communication
 
-### `npm run build`
+## Prerequisites
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- Node.js 16+
+- npm or yarn
+- HTPI Admin Service running
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Installation
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/htpi-admin-portal.git
+cd htpi-admin-portal
+```
 
-### `npm run eject`
+2. Install dependencies:
+```bash
+npm install
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+3. Create environment file:
+```bash
+cp .env.example .env
+```
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+4. Update `.env` with your configuration:
+```env
+REACT_APP_API_URL=http://localhost:8080
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+## Development
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+Start the development server:
+```bash
+npm start
+```
 
-## Learn More
+The app will open at [http://localhost:3000](http://localhost:3000)
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Building for Production
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```bash
+npm run build
+```
+
+This creates an optimized production build in the `build` folder.
+
+## Default Credentials
+
+For initial setup, use the super admin credentials configured in the admin service:
+- Email: `admin@htpi.com`
+- Password: `changeme123`
+
+**Important**: Change these credentials immediately after first login!
+
+## Admin Roles
+
+### Super Admin
+- Full system access
+- Can create/manage other admins
+- Access to all organizations
+- System configuration
+
+### Organization Admin
+- Manage specific organizations
+- User management within orgs
+- View organization reports
+
+### Billing Admin
+- View/update billing information
+- Handle subscriptions
+- Export financial reports
+
+### Clinical Admin
+- View clinical data
+- Audit healthcare operations
+- Generate compliance reports
+
+### Support Admin
+- Read-only access
+- Monitor system health
+- Assist with troubleshooting
+
+## Project Structure
+
+```
+src/
+├── components/       # Reusable UI components
+├── contexts/        # React contexts (Auth)
+├── pages/           # Page components
+├── services/        # API service layer
+├── types/           # TypeScript type definitions
+├── utils/           # Utility functions
+├── App.tsx          # Main app component
+└── index.tsx        # Entry point
+```
+
+## Available Pages
+
+- **/login** - Admin authentication
+- **/dashboard** - System overview and metrics
+- **/organizations** - Organization management
+- **/organizations/:id** - Organization details
+- **/users** - User management across orgs
+- **/admins** - Admin user management
+- **/reports** - Analytics and reporting
+- **/audit-logs** - Security audit trail
+- **/system-health** - Service monitoring
+- **/settings** - System configuration
+
+## Security Features
+
+- JWT-based authentication
+- Role-based access control (RBAC)
+- Audit logging of all actions
+- Session management
+- IP tracking
+- Failed login protection
+
+## API Integration
+
+The portal communicates with the HTPI Admin Service for all operations:
+
+```typescript
+// Example API call
+const response = await api.getOrganizations({
+  status: 'active',
+  limit: 50
+});
+```
+
+## State Management
+
+- **React Query**: Server state and caching
+- **React Context**: Authentication state
+- **Local Storage**: Auth tokens only
+
+## Performance
+
+- Code splitting for faster loads
+- Lazy loading of routes
+- Optimized re-renders
+- Efficient data fetching
+- Response caching
+
+## Monitoring
+
+The admin portal provides:
+- Real-time system metrics
+- Service health status
+- Active user monitoring
+- Claim processing stats
+- Organization usage tracking
+
+## Deployment
+
+### Deploy to Vercel
+```bash
+npm install -g vercel
+vercel
+```
+
+### Deploy to Netlify
+```bash
+npm install -g netlify-cli
+netlify deploy --prod --dir=build
+```
+
+### Deploy to Railway
+```bash
+railway login
+railway link
+railway up
+```
+
+## Environment Variables
+
+- `REACT_APP_API_URL` - Admin service API endpoint
+
+## Browser Support
+
+- Chrome (latest)
+- Firefox (latest)
+- Safari (latest)
+- Edge (latest)
+
+## Troubleshooting
+
+### Login Issues
+- Verify admin service is running
+- Check API_URL configuration
+- Ensure correct credentials
+
+### Permission Errors
+- Verify admin role and permissions
+- Check organization access
+- Review audit logs
+
+### API Connection
+- Check CORS settings
+- Verify network connectivity
+- Check service health
+
+## Contributing
+
+1. Fork the repository
+2. Create feature branch
+3. Commit changes
+4. Push to branch
+5. Create pull request
+
+## License
+
+MIT
