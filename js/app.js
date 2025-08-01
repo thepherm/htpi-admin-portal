@@ -8,17 +8,45 @@ const GATEWAY_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:3000' 
     : 'https://htpi-gateway-service.railway.app';
 
+// Debug mode
+const DEBUG = true;
+
+// Logger utility
+const logger = {
+    log: (message, data = null) => {
+        if (DEBUG) {
+            console.log(`[HTPI Admin] ${new Date().toISOString()} - ${message}`, data || '');
+        }
+    },
+    error: (message, error = null) => {
+        console.error(`[HTPI Admin ERROR] ${new Date().toISOString()} - ${message}`, error || '');
+    },
+    warn: (message, data = null) => {
+        if (DEBUG) {
+            console.warn(`[HTPI Admin WARN] ${new Date().toISOString()} - ${message}`, data || '');
+        }
+    }
+};
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    logger.log('Initializing HTPI Admin Portal');
+    logger.log('Gateway URL:', GATEWAY_URL);
+    
     // Check for stored auth token
     authToken = localStorage.getItem('authToken');
     if (authToken) {
+        logger.log('Found stored auth token, attempting to connect');
         connectSocket();
+    } else {
+        logger.log('No auth token found, showing login screen');
     }
 });
 
 // Socket.IO Connection
 function connectSocket() {
+    logger.log('Attempting to connect to gateway with auth token');
+    
     socket = io(GATEWAY_URL, {
         auth: {
             token: authToken
@@ -27,24 +55,37 @@ function connectSocket() {
     });
 
     socket.on('connect', () => {
-        console.log('Connected to gateway');
+        logger.log('Successfully connected to gateway', {
+            socketId: socket.id,
+            transport: socket.io.engine.transport.name
+        });
         showMainApp();
         loadDashboard();
     });
 
-    socket.on('disconnect', () => {
-        console.log('Disconnected from gateway');
+    socket.on('disconnect', (reason) => {
+        logger.warn('Disconnected from gateway', { reason });
+    });
+
+    socket.on('connect_error', (error) => {
+        logger.error('Connection error', {
+            message: error.message,
+            type: error.type,
+            data: error.data
+        });
     });
 
     socket.on('error', (error) => {
-        console.error('Socket error:', error);
+        logger.error('Socket error', error);
         if (error.type === 'auth') {
+            logger.warn('Authentication error, logging out');
             logout();
         }
     });
 
     // Event listeners for real-time updates
     socket.on('organization_created', (data) => {
+        logger.log('Organization created event received', data);
         showNotification('New organization created', 'success');
         if (currentView === 'organizations') {
             loadOrganizations();
@@ -52,6 +93,7 @@ function connectSocket() {
     });
 
     socket.on('organization_updated', (data) => {
+        logger.log('Organization updated event received', data);
         showNotification('Organization updated', 'info');
         if (currentView === 'organizations') {
             loadOrganizations();
@@ -59,6 +101,7 @@ function connectSocket() {
     });
 
     socket.on('stats_updated', (data) => {
+        logger.log('Stats updated event received', data);
         if (currentView === 'dashboard') {
             updateDashboardStats(data);
         }
@@ -72,31 +115,53 @@ function login(event) {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     
+    logger.log('Attempting login', { email });
+    
     // Connect to socket for login
     const tempSocket = io(GATEWAY_URL, {
         transports: ['websocket', 'polling']
     });
 
     tempSocket.on('connect', () => {
+        logger.log('Temporary socket connected for login', {
+            socketId: tempSocket.id,
+            transport: tempSocket.io.engine.transport.name
+        });
+        
+        logger.log('Emitting admin:login event');
         tempSocket.emit('admin:login', { email, password }, (response) => {
+            logger.log('Login response received', {
+                success: response.success,
+                error: response.error,
+                hasToken: !!response.data?.token,
+                hasUser: !!response.data?.user
+            });
+            
             if (response.success) {
                 authToken = response.data.token;
                 currentUser = response.data.user;
                 localStorage.setItem('authToken', authToken);
+                logger.log('Login successful, storing token and connecting main socket');
                 tempSocket.disconnect();
                 connectSocket();
             } else {
+                logger.error('Login failed', { error: response.error });
                 showLoginError(response.error || 'Invalid credentials');
             }
         });
     });
 
-    tempSocket.on('connect_error', () => {
+    tempSocket.on('connect_error', (error) => {
+        logger.error('Cannot connect to server for login', {
+            message: error.message,
+            type: error.type
+        });
         showLoginError('Cannot connect to server');
     });
 }
 
 function logout() {
+    logger.log('Logging out user');
     if (socket) {
         socket.disconnect();
     }
@@ -133,6 +198,8 @@ function showLoginError(message) {
 let currentView = 'dashboard';
 
 function showView(viewName) {
+    logger.log('Switching to view:', viewName);
+    
     // Hide all views
     document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
     
@@ -168,17 +235,26 @@ function showView(viewName) {
 
 // Dashboard
 function loadDashboard() {
+    logger.log('Loading dashboard stats');
     socket.emit('admin:stats:get', {}, (response) => {
+        logger.log('Dashboard stats response', {
+            success: response.success,
+            data: response.data,
+            error: response.error
+        });
         if (response.success) {
             updateDashboardStats(response.data);
+        } else {
+            logger.error('Failed to load dashboard stats', { error: response.error });
         }
     });
 }
 
 function updateDashboardStats(stats) {
-    document.getElementById('totalOrgs').textContent = stats.total_organizations || 0;
-    document.getElementById('activeUsers').textContent = stats.active_users || 0;
-    document.getElementById('claimsToday').textContent = stats.claims_today || 0;
+    logger.log('Updating dashboard stats', stats);
+    document.getElementById('totalOrgs').textContent = stats.totalOrganizations || stats.total_organizations || 0;
+    document.getElementById('activeUsers').textContent = stats.totalUsers || stats.active_users || 0;
+    document.getElementById('claimsToday').textContent = stats.totalClaims || stats.claims_today || 0;
     
     const statusEl = document.getElementById('systemStatus');
     statusEl.textContent = (stats.system_health || 'Unknown').toUpperCase();
@@ -189,14 +265,23 @@ function updateDashboardStats(stats) {
 
 // Organizations
 function loadOrganizations() {
+    logger.log('Loading organizations list');
     socket.emit('admin:organizations:list', { page: 1, limit: 20 }, (response) => {
+        logger.log('Organizations response', {
+            success: response.success,
+            count: response.data?.organizations?.length,
+            error: response.error
+        });
         if (response.success) {
             displayOrganizations(response.data.organizations);
+        } else {
+            logger.error('Failed to load organizations', { error: response.error });
         }
     });
 }
 
 function displayOrganizations(orgs) {
+    logger.log('Displaying organizations', { count: orgs.length });
     const tbody = document.getElementById('orgsTableBody');
     tbody.innerHTML = '';
     
@@ -256,14 +341,23 @@ function displayUsers(users) {
 
 // Services
 function loadServices() {
+    logger.log('Loading services status');
     socket.emit('admin:services:status', {}, (response) => {
+        logger.log('Services status response', {
+            success: response.success,
+            data: response.data,
+            error: response.error
+        });
         if (response.success) {
-            displayServices(response.data.services);
+            displayServices(response.data);
+        } else {
+            logger.error('Failed to load services', { error: response.error });
         }
     });
 }
 
 function displayServices(services) {
+    logger.log('Displaying services', services);
     const content = document.getElementById('servicesContent');
     content.innerHTML = '';
     
@@ -312,7 +406,7 @@ function displayServices(services) {
 // Utility Functions
 function showNotification(message, type = 'info') {
     // Simple notification - could be enhanced with a toast library
-    console.log(`[${type.toUpperCase()}] ${message}`);
+    logger.log(`Notification: ${message}`, { type });
 }
 
 // Subscribe to updates when connected
