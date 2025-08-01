@@ -74,8 +74,20 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    # Mock stats for development
+    mock_stats = {
+        'total_organizations': 2,
+        'total_users': 17,
+        'total_patients': 342,
+        'total_claims': 1847,
+        'pending_claims': 23,
+        'approved_claims': 1798,
+        'denied_claims': 26
+    }
+    
     return render_template('dashboard/index.html', 
-                         user=session.get('user'))
+                         user=session.get('user'),
+                         stats=mock_stats)
 
 @app.route('/tenants')
 @login_required
@@ -99,8 +111,37 @@ def users():
 @app.route('/services')
 @login_required
 def services():
+    # Mock service status for development
+    mock_services = {
+        'gateway': {
+            'healthy': True,
+            'message': 'Handling API requests'
+        },
+        'admin': {
+            'healthy': True,
+            'message': 'Portal operational'
+        },
+        'patient': {
+            'healthy': True,
+            'message': 'Processing patient data'
+        },
+        'insurance': {
+            'healthy': False,
+            'message': 'Service unavailable'
+        },
+        'mongodb': {
+            'healthy': True,
+            'message': 'Database operational'
+        },
+        'nats': {
+            'healthy': False,
+            'message': 'Message broker offline'
+        }
+    }
+    
     return render_template('services/index.html', 
-                         user=session.get('user'))
+                         user=session.get('user'),
+                         services=mock_services)
 
 # Session management endpoint
 @app.route('/auth/session', methods=['POST'])
