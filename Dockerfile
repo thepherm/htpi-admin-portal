@@ -18,8 +18,8 @@ COPY . .
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Expose port
-EXPOSE 5000
+# Expose port (Railway sets PORT env var)
+EXPOSE 8080
 
-# Run with gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "app:app"]
+# Run with gunicorn using PORT env var
+CMD gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 4 --timeout 120 app:app
