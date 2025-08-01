@@ -1,0 +1,565 @@
+{% extends "layout.html" %}
+
+{% block title %}Tenant Details - HTPI Admin Portal{% endblock %}
+
+{% block page_content %}
+<div class="mb-8">
+    <nav class="flex" aria-label="Breadcrumb">
+        <ol class="flex items-center space-x-4">
+            <li>
+                <a href="/tenants" class="text-gray-400 hover:text-gray-500">Tenants</a>
+            </li>
+            <li>
+                <div class="flex items-center">
+                    <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                    <span class="text-gray-500" id="tenantName">Loading...</span>
+                </div>
+            </li>
+        </ol>
+    </nav>
+</div>
+
+<!-- Tenant Info -->
+<div class="bg-white shadow rounded-lg p-6 mb-8">
+    <h2 class="text-lg font-medium text-gray-900 mb-4">Tenant Information</h2>
+    <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2" id="tenantInfo">
+        <div>
+            <dt class="text-sm font-medium text-gray-500">Name</dt>
+            <dd class="mt-1 text-sm text-gray-900" id="tenantInfoName">-</dd>
+        </div>
+        <div>
+            <dt class="text-sm font-medium text-gray-500">Domain</dt>
+            <dd class="mt-1 text-sm text-gray-900" id="tenantInfoDomain">-</dd>
+        </div>
+        <div>
+            <dt class="text-sm font-medium text-gray-500">Status</dt>
+            <dd class="mt-1 text-sm" id="tenantInfoStatus">-</dd>
+        </div>
+        <div>
+            <dt class="text-sm font-medium text-gray-500">Created</dt>
+            <dd class="mt-1 text-sm text-gray-900" id="tenantInfoCreated">-</dd>
+        </div>
+    </dl>
+</div>
+
+<!-- Tabs -->
+<div class="border-b border-gray-200 mb-8">
+    <nav class="-mb-px flex space-x-8">
+        <button onclick="showTab('users')" id="usersTab" class="tab-button border-indigo-500 text-indigo-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+            Users
+        </button>
+        <button onclick="showTab('claimmd')" id="claimmdTab" class="tab-button border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+            ClaimMD Accounts
+        </button>
+        <button onclick="showTab('settings')" id="settingsTab" class="tab-button border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+            Settings
+        </button>
+    </nav>
+</div>
+
+<!-- Users Tab -->
+<div id="usersTabContent" class="tab-content">
+    <div class="sm:flex sm:items-center mb-4">
+        <div class="sm:flex-auto">
+            <h3 class="text-lg font-medium text-gray-900">Users</h3>
+            <p class="mt-1 text-sm text-gray-700">Manage users for this tenant.</p>
+        </div>
+        <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+            <button onclick="showAddUserModal()" class="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700">
+                <i class="fas fa-plus mr-2"></i>Add User
+            </button>
+        </div>
+    </div>
+    
+    <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+        <table class="min-w-full divide-y divide-gray-300">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Email</th>
+                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Role</th>
+                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
+                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Last Login</th>
+                    <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                        <span class="sr-only">Actions</span>
+                    </th>
+                </tr>
+            </thead>
+            <tbody id="usersTableBody" class="divide-y divide-gray-200 bg-white">
+                <tr>
+                    <td colspan="6" class="text-center py-4">
+                        <i class="fas fa-circle-notch fa-spin text-gray-400 mr-2"></i>
+                        Loading users...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ClaimMD Tab -->
+<div id="claimmdTabContent" class="tab-content hidden">
+    <div class="sm:flex sm:items-center mb-4">
+        <div class="sm:flex-auto">
+            <h3 class="text-lg font-medium text-gray-900">ClaimMD Accounts</h3>
+            <p class="mt-1 text-sm text-gray-700">Manage ClaimMD API credentials for this tenant.</p>
+        </div>
+        <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+            <button onclick="showAddClaimMDModal()" class="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700">
+                <i class="fas fa-plus mr-2"></i>Add ClaimMD Account
+            </button>
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" id="claimmdAccountsGrid">
+        <div class="text-center py-8 text-gray-500">
+            <i class="fas fa-circle-notch fa-spin text-gray-400 mr-2"></i>
+            Loading ClaimMD accounts...
+        </div>
+    </div>
+</div>
+
+<!-- Settings Tab -->
+<div id="settingsTabContent" class="tab-content hidden">
+    <div class="bg-white shadow rounded-lg p-6">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Tenant Settings</h3>
+        <form id="tenantSettingsForm">
+            <div class="space-y-4">
+                <div>
+                    <label for="tenantName" class="block text-sm font-medium text-gray-700">Tenant Name</label>
+                    <input type="text" name="name" id="tenantNameInput" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="tenantDomain" class="block text-sm font-medium text-gray-700">Domain</label>
+                    <input type="text" name="domain" id="tenantDomainInput" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="tenantStatus" class="block text-sm font-medium text-gray-700">Status</label>
+                    <select name="status" id="tenantStatusInput" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <option value="Active">Active</option>
+                        <option value="Suspended">Suspended</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mt-6">
+                <button type="submit" class="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div id="addUserModal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-lg sm:w-full sm:p-6">
+        <div class="absolute top-0 right-0 pt-4 pr-4">
+            <button onclick="closeAddUserModal()" class="bg-white rounded-md text-gray-400 hover:text-gray-500">
+                <span class="sr-only">Close</span>
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Add User to Tenant</h3>
+            <form id="addUserForm">
+                <div class="space-y-4">
+                    <div>
+                        <label for="userEmail" class="block text-sm font-medium text-gray-700">Email</label>
+                        <input type="email" name="email" id="userEmail" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="userName" class="block text-sm font-medium text-gray-700">Name</label>
+                        <input type="text" name="name" id="userName" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="userRole" class="block text-sm font-medium text-gray-700">Role</label>
+                        <select name="role" id="userRole" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                    <button type="submit" id="addUserBtn" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:col-start-2 sm:text-sm">
+                        Add User
+                    </button>
+                    <button type="button" onclick="closeAddUserModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add ClaimMD Modal -->
+<div id="addClaimMDModal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-lg sm:w-full sm:p-6">
+        <div class="absolute top-0 right-0 pt-4 pr-4">
+            <button onclick="closeAddClaimMDModal()" class="bg-white rounded-md text-gray-400 hover:text-gray-500">
+                <span class="sr-only">Close</span>
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Add ClaimMD Account</h3>
+            <form id="addClaimMDForm">
+                <div class="space-y-4">
+                    <div>
+                        <label for="accountName" class="block text-sm font-medium text-gray-700">Account Name</label>
+                        <input type="text" name="accountName" id="accountName" required placeholder="e.g., Main Office" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="apiKey" class="block text-sm font-medium text-gray-700">API Key</label>
+                        <input type="text" name="apiKey" id="apiKey" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="apiSecret" class="block text-sm font-medium text-gray-700">API Secret</label>
+                        <input type="password" name="apiSecret" id="apiSecret" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="environment" class="block text-sm font-medium text-gray-700">Environment</label>
+                        <select name="environment" id="environment" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <option value="production">Production</option>
+                            <option value="sandbox">Sandbox</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                    <button type="submit" id="addClaimMDBtn" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:col-start-2 sm:text-sm">
+                        Add Account
+                    </button>
+                    <button type="button" onclick="closeAddClaimMDModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Initialize Socket.IO with auth token
+    const socket = initSocket('{{ session_token }}');
+    const tenantId = '{{ tenant_id }}';
+    let currentTenant = null;
+    let tenantUsers = [];
+    let claimMDAccounts = [];
+    
+    // Subscribe to tenant data when connected
+    socket.on('connect', () => {
+        console.log('Tenant detail page connected to gateway');
+        
+        // Subscribe to tenant updates
+        socket.emit('admin:tenant:subscribe', { tenantId });
+    });
+    
+    // Listen for tenant data
+    socket.on('admin:tenant:data', (data) => {
+        currentTenant = data.tenant;
+        tenantUsers = data.users || [];
+        claimMDAccounts = data.claimMDAccounts || [];
+        
+        updateTenantInfo();
+        renderUsers();
+        renderClaimMDAccounts();
+    });
+    
+    // Listen for user updates
+    socket.on('admin:tenant:user:added', (user) => {
+        tenantUsers.push(user);
+        renderUsers();
+        showNotification('User added successfully', 'success');
+    });
+    
+    // Listen for ClaimMD account updates
+    socket.on('admin:tenant:claimmd:added', (account) => {
+        claimMDAccounts.push(account);
+        renderClaimMDAccounts();
+        showNotification('ClaimMD account added successfully', 'success');
+    });
+    
+    function updateTenantInfo() {
+        if (!currentTenant) return;
+        
+        document.getElementById('tenantName').textContent = currentTenant.name;
+        document.getElementById('tenantInfoName').textContent = currentTenant.name;
+        document.getElementById('tenantInfoDomain').textContent = currentTenant.domain || '-';
+        document.getElementById('tenantInfoStatus').innerHTML = `<span class="inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${getStatusClass(currentTenant.status)}">${currentTenant.status}</span>`;
+        document.getElementById('tenantInfoCreated').textContent = formatDate(currentTenant.createdAt);
+        
+        // Update settings form
+        document.getElementById('tenantNameInput').value = currentTenant.name;
+        document.getElementById('tenantDomainInput').value = currentTenant.domain || '';
+        document.getElementById('tenantStatusInput').value = currentTenant.status;
+    }
+    
+    function renderUsers() {
+        const tbody = document.getElementById('usersTableBody');
+        
+        if (tenantUsers.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center py-4 text-gray-500">
+                        No users found
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = tenantUsers.map(user => `
+            <tr>
+                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+                    <div class="font-medium text-gray-900">${user.name}</div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    ${user.email}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    <span class="inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}">
+                        ${user.role}
+                    </span>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm">
+                    <span class="inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                        ${user.status}
+                    </span>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    ${user.lastLogin ? formatDate(user.lastLogin) : 'Never'}
+                </td>
+                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                    <button onclick="removeUser('${user.id}')" class="text-red-600 hover:text-red-900">Remove</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+    
+    function renderClaimMDAccounts() {
+        const grid = document.getElementById('claimmdAccountsGrid');
+        
+        if (claimMDAccounts.length === 0) {
+            grid.innerHTML = `
+                <div class="col-span-full text-center py-8 text-gray-500">
+                    No ClaimMD accounts configured
+                </div>
+            `;
+            return;
+        }
+        
+        grid.innerHTML = claimMDAccounts.map(account => `
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-900">${account.accountName}</h4>
+                        <p class="mt-1 text-sm text-gray-500">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${account.environment === 'production' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                                ${account.environment}
+                            </span>
+                        </p>
+                    </div>
+                    <button onclick="removeClaimMDAccount('${account.id}')" class="text-red-600 hover:text-red-900">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                <dl class="mt-4 space-y-2">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">API Key</dt>
+                        <dd class="mt-1 text-sm text-gray-900 font-mono">
+                            ${account.apiKey.substring(0, 8)}...${account.apiKey.substring(account.apiKey.length - 4)}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Created</dt>
+                        <dd class="mt-1 text-sm text-gray-900">${formatDate(account.createdAt)}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Status</dt>
+                        <dd class="mt-1 text-sm">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${account.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${account.status}
+                            </span>
+                        </dd>
+                    </div>
+                </dl>
+                <div class="mt-4">
+                    <button onclick="testClaimMDAccount('${account.id}')" class="text-indigo-600 hover:text-indigo-900 text-sm">
+                        Test Connection
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    // Tab functionality
+    function showTab(tabName) {
+        // Update tab buttons
+        document.querySelectorAll('.tab-button').forEach(btn => {
+            btn.classList.remove('border-indigo-500', 'text-indigo-600');
+            btn.classList.add('border-transparent', 'text-gray-500');
+        });
+        document.getElementById(tabName + 'Tab').classList.remove('border-transparent', 'text-gray-500');
+        document.getElementById(tabName + 'Tab').classList.add('border-indigo-500', 'text-indigo-600');
+        
+        // Update tab content
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.add('hidden');
+        });
+        document.getElementById(tabName + 'TabContent').classList.remove('hidden');
+    }
+    
+    // Modal functions
+    function showAddUserModal() {
+        document.getElementById('addUserModal').classList.remove('hidden');
+    }
+    
+    function closeAddUserModal() {
+        document.getElementById('addUserModal').classList.add('hidden');
+        document.getElementById('addUserForm').reset();
+    }
+    
+    function showAddClaimMDModal() {
+        document.getElementById('addClaimMDModal').classList.remove('hidden');
+    }
+    
+    function closeAddClaimMDModal() {
+        document.getElementById('addClaimMDModal').classList.add('hidden');
+        document.getElementById('addClaimMDForm').reset();
+    }
+    
+    // Form submissions
+    document.getElementById('addUserForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const userData = Object.fromEntries(formData);
+        const addBtn = document.getElementById('addUserBtn');
+        
+        addBtn.disabled = true;
+        addBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Adding...';
+        
+        try {
+            await socketRequest('admin:tenant:user:add', {
+                tenantId,
+                ...userData
+            });
+            closeAddUserModal();
+        } catch (error) {
+            showNotification(error.message || 'Failed to add user', 'error');
+        } finally {
+            addBtn.disabled = false;
+            addBtn.innerHTML = 'Add User';
+        }
+    });
+    
+    document.getElementById('addClaimMDForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const accountData = Object.fromEntries(formData);
+        const addBtn = document.getElementById('addClaimMDBtn');
+        
+        addBtn.disabled = true;
+        addBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Adding...';
+        
+        try {
+            await socketRequest('admin:tenant:claimmd:add', {
+                tenantId,
+                ...accountData
+            });
+            closeAddClaimMDModal();
+        } catch (error) {
+            showNotification(error.message || 'Failed to add ClaimMD account', 'error');
+        } finally {
+            addBtn.disabled = false;
+            addBtn.innerHTML = 'Add Account';
+        }
+    });
+    
+    document.getElementById('tenantSettingsForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const settingsData = Object.fromEntries(formData);
+        
+        try {
+            await socketRequest('admin:tenant:update', {
+                tenantId,
+                ...settingsData
+            });
+            showNotification('Settings updated successfully', 'success');
+        } catch (error) {
+            showNotification(error.message || 'Failed to update settings', 'error');
+        }
+    });
+    
+    // Action functions
+    async function removeUser(userId) {
+        if (!confirm('Are you sure you want to remove this user from the tenant?')) return;
+        
+        try {
+            await socketRequest('admin:tenant:user:remove', {
+                tenantId,
+                userId
+            });
+            tenantUsers = tenantUsers.filter(u => u.id !== userId);
+            renderUsers();
+            showNotification('User removed successfully', 'success');
+        } catch (error) {
+            showNotification(error.message || 'Failed to remove user', 'error');
+        }
+    }
+    
+    async function removeClaimMDAccount(accountId) {
+        if (!confirm('Are you sure you want to remove this ClaimMD account?')) return;
+        
+        try {
+            await socketRequest('admin:tenant:claimmd:remove', {
+                tenantId,
+                accountId
+            });
+            claimMDAccounts = claimMDAccounts.filter(a => a.id !== accountId);
+            renderClaimMDAccounts();
+            showNotification('ClaimMD account removed successfully', 'success');
+        } catch (error) {
+            showNotification(error.message || 'Failed to remove account', 'error');
+        }
+    }
+    
+    async function testClaimMDAccount(accountId) {
+        try {
+            const response = await socketRequest('admin:tenant:claimmd:test', {
+                tenantId,
+                accountId
+            });
+            
+            if (response.success) {
+                showNotification('Connection test successful', 'success');
+            } else {
+                showNotification(response.error || 'Connection test failed', 'error');
+            }
+        } catch (error) {
+            showNotification(error.message || 'Failed to test connection', 'error');
+        }
+    }
+    
+    // Utility functions
+    function getStatusClass(status) {
+        const classes = {
+            'Active': 'bg-green-100 text-green-800',
+            'active': 'bg-green-100 text-green-800',
+            'Inactive': 'bg-red-100 text-red-800',
+            'inactive': 'bg-red-100 text-red-800',
+            'Suspended': 'bg-yellow-100 text-yellow-800',
+            'suspended': 'bg-yellow-100 text-yellow-800'
+        };
+        return classes[status] || 'bg-gray-100 text-gray-800';
+    }
+    
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString();
+    }
+</script>
+{% endblock %}

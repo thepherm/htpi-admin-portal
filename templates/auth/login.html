@@ -1,53 +1,127 @@
 {% extends "base.html" %}
 
-{% block title %}Login - HTPI Admin Portal{% endblock %}
+{% block title %}Admin Login - HTPI Admin Portal{% endblock %}
 
 {% block content %}
-<div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
     <div class="max-w-md w-full space-y-8">
         <div>
             <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
                 HTPI Admin Portal
             </h2>
             <p class="mt-2 text-center text-sm text-gray-600">
-                Sign in to your account
+                Sign in with admin credentials
             </p>
         </div>
-        <form class="mt-8 space-y-6" method="POST">
-            {{ form.hidden_tag() }}
+        <form class="mt-8 space-y-6" id="loginForm">
             <div class="rounded-md shadow-sm -space-y-px">
                 <div>
-                    {{ form.email.label(class="sr-only") }}
-                    {{ form.email(class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm", placeholder="Email address") }}
-                    {% if form.email.errors %}
-                        <p class="mt-1 text-sm text-red-600">{{ form.email.errors[0] }}</p>
-                    {% endif %}
+                    <label for="email" class="sr-only">Email address</label>
+                    <input id="email" name="email" type="email" required 
+                        class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
+                        placeholder="Admin email">
                 </div>
                 <div>
-                    {{ form.password.label(class="sr-only") }}
-                    {{ form.password(class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm", placeholder="Password") }}
-                    {% if form.password.errors %}
-                        <p class="mt-1 text-sm text-red-600">{{ form.password.errors[0] }}</p>
-                    {% endif %}
+                    <label for="password" class="sr-only">Password</label>
+                    <input id="password" name="password" type="password" required 
+                        class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
+                        placeholder="Password">
                 </div>
             </div>
 
-            <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                    {{ form.remember_me(class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded") }}
-                    {{ form.remember_me.label(class="ml-2 block text-sm text-gray-900") }}
+            <div id="loginError" class="hidden rounded-md bg-red-50 p-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-circle text-red-400"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm font-medium text-red-800" id="loginErrorText"></p>
+                    </div>
                 </div>
             </div>
 
             <div>
-                <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <button type="submit" id="loginButton" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                     <span class="absolute left-0 inset-y-0 flex items-center pl-3">
-                        <i class="fas fa-lock text-indigo-500 group-hover:text-indigo-400"></i>
+                        <i class="fas fa-shield-alt text-indigo-500 group-hover:text-indigo-400"></i>
                     </span>
-                    Sign in
+                    Admin Sign In
                 </button>
             </div>
         </form>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Use the already initialized socket from base template
+    
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const errorDiv = document.getElementById('loginError');
+        const errorText = document.getElementById('loginErrorText');
+        const loginButton = document.getElementById('loginButton');
+        
+        // Disable button and show loading
+        loginButton.disabled = true;
+        loginButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating...';
+        errorDiv.classList.add('hidden');
+        
+        // Emit login event to server
+        socket.emit('auth:login', { email, password });
+        
+        // Listen for login response
+        socket.once('auth:login:response', async (response) => {
+            if (response.success) {
+                // Store session on server
+                try {
+                    const sessionResponse = await fetch('/auth/session', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            authenticated: true,
+                            user: response.user,
+                            token: response.token
+                        }),
+                        credentials: 'same-origin'
+                    });
+                    
+                    if (sessionResponse.ok) {
+                        // Redirect to dashboard
+                        window.location.href = '/dashboard';
+                    } else {
+                        const data = await sessionResponse.json();
+                        throw new Error(data.error || 'Failed to create session');
+                    }
+                } catch (error) {
+                    errorText.textContent = error.message || 'Failed to create session. Please try again.';
+                    errorDiv.classList.remove('hidden');
+                }
+            } else {
+                errorText.textContent = response.error || 'Invalid credentials or insufficient permissions';
+                errorDiv.classList.remove('hidden');
+            }
+            
+            // Re-enable button
+            loginButton.disabled = false;
+            loginButton.innerHTML = '<span class="absolute left-0 inset-y-0 flex items-center pl-3"><i class="fas fa-shield-alt text-indigo-500 group-hover:text-indigo-400"></i></span>Admin Sign In';
+        });
+        
+        // Handle timeout
+        setTimeout(() => {
+            if (loginButton.disabled) {
+                errorText.textContent = 'Login timeout. Please try again.';
+                errorDiv.classList.remove('hidden');
+                loginButton.disabled = false;
+                loginButton.innerHTML = '<span class="absolute left-0 inset-y-0 flex items-center pl-3"><i class="fas fa-shield-alt text-indigo-500 group-hover:text-indigo-400"></i></span>Admin Sign In';
+            }
+        }, 10000);
+    });
+</script>
 {% endblock %}

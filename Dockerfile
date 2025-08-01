@@ -19,7 +19,7 @@ RUN useradd -m -u 1001 appuser && chown -R appuser:appuser /app
 USER appuser
 
 # Expose port (Railway sets PORT env var)
-EXPOSE 5000
+EXPOSE 5001
 
-# Run with gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "app:app"]
+# Run with gunicorn and eventlet for Socket.IO support
+CMD ["gunicorn", "--worker-class", "eventlet", "--bind", "0.0.0.0:5001", "--workers", "1", "--timeout", "120", "app:app"]

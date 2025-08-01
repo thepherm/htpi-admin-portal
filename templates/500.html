@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Server Error - HTPI Admin Portal{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full text-center">
+        <h1 class="text-6xl font-bold text-gray-900">500</h1>
+        <p class="mt-2 text-xl text-gray-600">Server Error</p>
+        <p class="mt-2 text-gray-500">Something went wrong on our end. Please try again later.</p>
+        <div class="mt-6">
+            <a href="/" class="text-indigo-600 hover:text-indigo-500">
+                Go back to dashboard
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

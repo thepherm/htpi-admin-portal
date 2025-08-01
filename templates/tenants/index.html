@@ -1,0 +1,267 @@
+{% extends "layout.html" %}
+
+{% block title %}Tenants - HTPI Admin Portal{% endblock %}
+
+{% block page_content %}
+<div class="sm:flex sm:items-center">
+    <div class="sm:flex-auto">
+        <h1 class="text-xl font-semibold text-gray-900">Tenants</h1>
+        <p class="mt-2 text-sm text-gray-700">Manage all tenants in the system.</p>
+    </div>
+    <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+        <button onclick="showAddTenantModal()" class="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700">
+            <i class="fas fa-plus mr-2"></i>Add Tenant
+        </button>
+    </div>
+</div>
+
+<!-- Tenants Table -->
+<div class="mt-8 flex flex-col">
+    <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
+        <div class="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
+            <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                <table class="min-w-full divide-y divide-gray-300">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Domain</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Users</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">ClaimMD Accounts</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Created</th>
+                            <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                                <span class="sr-only">Actions</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="tenantsTableBody" class="divide-y divide-gray-200 bg-white">
+                        <tr>
+                            <td colspan="7" class="text-center py-4">
+                                <i class="fas fa-circle-notch fa-spin text-gray-400 mr-2"></i>
+                                Loading tenants...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Tenant Modal -->
+<div id="addTenantModal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-lg sm:w-full sm:p-6">
+        <div class="absolute top-0 right-0 pt-4 pr-4">
+            <button onclick="closeAddTenantModal()" class="bg-white rounded-md text-gray-400 hover:text-gray-500">
+                <span class="sr-only">Close</span>
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Add New Tenant</h3>
+            <form id="addTenantForm">
+                <div class="space-y-4">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700">Tenant Name</label>
+                        <input type="text" name="name" id="name" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="domain" class="block text-sm font-medium text-gray-700">Domain (optional)</label>
+                        <input type="text" name="domain" id="domain" placeholder="example.com" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="adminEmail" class="block text-sm font-medium text-gray-700">Admin Email</label>
+                        <input type="email" name="adminEmail" id="adminEmail" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="adminName" class="block text-sm font-medium text-gray-700">Admin Name</label>
+                        <input type="text" name="adminName" id="adminName" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                </div>
+                <div class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                    <button type="submit" id="addTenantBtn" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:col-start-2 sm:text-sm">
+                        Create Tenant
+                    </button>
+                    <button type="button" onclick="closeAddTenantModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Socket is already initialized in base template
+    let allTenants = [];
+    
+    // Subscribe to tenant data when connected
+    socket.on('connect', () => {
+        console.log('Tenants page connected to gateway');
+        
+        // Subscribe to tenant updates
+        socket.emit('admin:tenants:subscribe');
+    });
+    
+    // Listen for tenant list updates
+    socket.on('admin:tenants:list', (tenants) => {
+        allTenants = tenants || [];
+        renderTenants(allTenants);
+    });
+    
+    // Listen for individual tenant updates
+    socket.on('admin:tenants:update', (tenant) => {
+        const index = allTenants.findIndex(t => t.id === tenant.id);
+        if (index >= 0) {
+            allTenants[index] = tenant;
+        } else {
+            allTenants.unshift(tenant);
+        }
+        renderTenants(allTenants);
+    });
+    
+    // Listen for tenant creation
+    socket.on('admin:tenants:created', (tenant) => {
+        allTenants.unshift(tenant);
+        renderTenants(allTenants);
+        showNotification('Tenant created successfully', 'success');
+    });
+    
+    function renderTenants(tenants) {
+        const tbody = document.getElementById('tenantsTableBody');
+        
+        if (!socket.connected) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-red-600">
+                        <i class="fas fa-exclamation-circle mr-2"></i>
+                        Disconnected from server. Attempting to reconnect...
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        if (tenants.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-gray-500">
+                        No tenants found
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = tenants.map(tenant => `
+            <tr>
+                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+                    <div class="font-medium text-gray-900">${tenant.name}</div>
+                    <div class="text-gray-500">ID: ${tenant.id}</div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    ${tenant.domain || '-'}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm">
+                    <span class="inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${getStatusClass(tenant.status)}">
+                        ${tenant.status || 'Active'}
+                    </span>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    ${tenant.userCount || 0}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    ${tenant.claimMDAccounts || 0}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    ${formatDate(tenant.createdAt)}
+                </td>
+                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                    <a href="/tenants/${tenant.id}" class="text-indigo-600 hover:text-indigo-900">Manage</a>
+                </td>
+            </tr>
+        `).join('');
+    }
+    
+    function getStatusClass(status) {
+        const classes = {
+            'Active': 'bg-green-100 text-green-800',
+            'Inactive': 'bg-red-100 text-red-800',
+            'Suspended': 'bg-yellow-100 text-yellow-800'
+        };
+        return classes[status] || 'bg-gray-100 text-gray-800';
+    }
+    
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString();
+    }
+    
+    // Modal functions
+    function showAddTenantModal() {
+        document.getElementById('addTenantModal').classList.remove('hidden');
+    }
+    
+    function closeAddTenantModal() {
+        document.getElementById('addTenantModal').classList.add('hidden');
+        document.getElementById('addTenantForm').reset();
+    }
+    
+    // Add tenant form
+    document.getElementById('addTenantForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const tenantData = Object.fromEntries(formData);
+        const addBtn = document.getElementById('addTenantBtn');
+        
+        // Show loading state
+        addBtn.disabled = true;
+        addBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating...';
+        
+        // Generate request ID for response tracking
+        const requestId = Date.now().toString(36) + Math.random().toString(36);
+        
+        // Listen for response first
+        socket.once(`admin:tenants:create:response:${requestId}`, (response) => {
+            if (response.success) {
+                closeAddTenantModal();
+                showNotification('Tenant created successfully. Admin user credentials have been sent via email.', 'success');
+            } else {
+                showNotification(response.error || 'Failed to create tenant', 'error');
+            }
+            
+            // Reset button
+            addBtn.disabled = false;
+            addBtn.innerHTML = 'Create Tenant';
+        });
+        
+        // Emit the request
+        socket.emit('admin:tenants:create', { ...tenantData, requestId });
+        
+        // Timeout handler
+        setTimeout(() => {
+            socket.off(`admin:tenants:create:response:${requestId}`);
+            if (addBtn.disabled) {
+                showNotification('Request timeout. Please try again.', 'error');
+                addBtn.disabled = false;
+                addBtn.innerHTML = 'Create Tenant';
+            }
+        }, 30000);
+    });
+    
+    // Handle disconnection
+    socket.on('disconnect', () => {
+        console.log('Tenants page disconnected from gateway');
+        renderTenants(allTenants);
+    });
+    
+    // Handle reconnection
+    socket.on('reconnect', () => {
+        console.log('Tenants page reconnected to gateway');
+        // Re-subscribe to tenant data
+        socket.emit('admin:tenants:subscribe');
+    });
+</script>
+{% endblock %}
