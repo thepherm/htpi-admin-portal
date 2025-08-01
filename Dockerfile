@@ -1,23 +1,25 @@
-FROM node:18-alpine
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-RUN npm ci --only=production
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy static files
+# Copy requirements first for better caching
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
 COPY . .
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 && \
-    chown -R nodejs:nodejs /app
-
-USER nodejs
+RUN useradd -m -u 1001 appuser && chown -R appuser:appuser /app
+USER appuser
 
 # Expose port (Railway sets PORT env var)
-EXPOSE 3001
+EXPOSE 5000
 
-# Serve static files
-CMD ["npm", "start"]
+# Run with gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "app:app"]

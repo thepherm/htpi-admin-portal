@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Services - HTPI Admin Portal{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-2xl font-bold text-gray-900">Service Status</h1>
+    <p class="mt-1 text-sm text-gray-600">Monitor the health of all HTPI services</p>
+</div>
+
+<!-- Services Grid -->
+<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    {% for service_name, service_info in services.items() %}
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900">{{ service_name|title }} Service</h3>
+                    <p class="mt-1 text-sm text-gray-500">{{ service_info.message }}</p>
+                </div>
+                <div class="flex-shrink-0">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                        {% if service_info.healthy %}bg-green-100 text-green-800
+                        {% else %}bg-red-100 text-red-800{% endif %}">
+                        {% if service_info.healthy %}
+                            <i class="fas fa-check-circle mr-1"></i> Healthy
+                        {% else %}
+                            <i class="fas fa-exclamation-circle mr-1"></i> Down
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Service Details -->
+            <div class="mt-4 border-t pt-4">
+                <dl class="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+                    <div class="sm:col-span-1">
+                        <dt class="text-xs font-medium text-gray-500">Status</dt>
+                        <dd class="mt-1 text-sm text-gray-900">
+                            {% if service_info.healthy %}Operational{% else %}Not Responding{% endif %}
+                        </dd>
+                    </div>
+                    <div class="sm:col-span-1">
+                        <dt class="text-xs font-medium text-gray-500">Type</dt>
+                        <dd class="mt-1 text-sm text-gray-900">
+                            {% if service_name == 'gateway' %}API Gateway
+                            {% elif service_name == 'admin' %}Administration
+                            {% elif service_name == 'patient' %}Patient Management
+                            {% elif service_name == 'insurance' %}Insurance Processing
+                            {% elif service_name == 'form' %}Form Management
+                            {% elif service_name == 'claim' %}Claims Processing
+                            {% else %}Microservice{% endif %}
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- NATS Status -->
+<div class="mt-8">
+    <h2 class="text-lg font-medium text-gray-900 mb-4">Infrastructure Status</h2>
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">NATS Message Broker</h3>
+            <div class="mt-2 max-w-xl text-sm text-gray-500">
+                <p>The NATS message broker enables communication between all microservices.</p>
+            </div>
+            <div class="mt-3">
+                <span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium 
+                    {% if services.gateway.healthy or services.admin.healthy %}bg-green-100 text-green-800
+                    {% else %}bg-red-100 text-red-800{% endif %}">
+                    {% if services.gateway.healthy or services.admin.healthy %}
+                        <i class="fas fa-check-circle mr-1"></i> Connected
+                    {% else %}
+                        <i class="fas fa-exclamation-circle mr-1"></i> Disconnected
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Refresh Button -->
+<div class="mt-6 text-right">
+    <button onclick="location.reload();" 
+            class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+        <i class="fas fa-sync-alt mr-2"></i>
+        Refresh Status
+    </button>
+</div>
+{% endblock %}

@@ -1,15 +1,11 @@
 # HTPI Admin Portal
 
-A lightweight Socket.IO-based admin portal for the HTPI healthcare platform.
+Flask-based admin portal for the HTPI healthcare platform with MVC architecture.
 
 ## Architecture
 
 ```
-[Admin Portal (Browser)]
-         |
-    Socket.IO
-         |
-[Gateway Service]
+[Admin Portal (Flask MVC)]
          |
        NATS
          |
@@ -18,46 +14,72 @@ A lightweight Socket.IO-based admin portal for the HTPI healthcare platform.
 
 ## Features
 
-- Pure client-side application (no backend)
-- All communication via Socket.IO to the Gateway Service
-- Real-time updates for all data changes
-- JWT-based authentication
-- Responsive design with Tailwind CSS
+- Flask MVC architecture with proper separation of concerns
+- Controllers communicate directly with NATS
+- Local SQLite database for caching and session management
+- Server-side rendered templates with Tailwind CSS
+- Secure authentication with Flask-Login
+- Real-time NATS integration for all service communication
 
 ## Local Development
 
 ```bash
-npm install
-npm run dev
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Copy environment variables
+cp .env.example .env
+
+# Run the application
+python app.py
 ```
 
-Then open http://localhost:3001
+Then open http://localhost:5000
 
 ## Configuration
 
-The portal automatically connects to:
-- Local development: `http://localhost:3000` (Gateway Service)
-- Production: `https://htpi-gateway-service.railway.app`
+See `.env.example` for all configuration options:
+- `NATS_URL` - NATS server URL
+- `NATS_USER` - NATS username
+- `NATS_PASSWORD` - NATS password
+- `DATABASE_URL` - Database connection string
+- `SECRET_KEY` - Flask secret key
 
-## Socket.IO Events
+## NATS Communication
+
+The admin portal communicates with backend services via NATS:
 
 ### Authentication
-- `admin:login` - Login with email/password
-- Response includes JWT token
+- `admin.auth.login` - Authenticate admin user
+- `admin.auth.logout` - Log out admin user
 
-### Admin Operations
-- `admin:stats:get` - Get dashboard statistics
-- `admin:organizations:list` - List organizations
-- `admin:organizations:create` - Create new organization
-- `admin:organizations:get` - Get organization details
-- `admin:users:list` - List admin users
-- `admin:services:status` - Get service health status
+### Dashboard
+- `admin.stats.dashboard` - Get dashboard statistics
 
-### Real-time Events
-- `organization_created` - New organization created
-- `organization_updated` - Organization updated
-- `stats_updated` - Dashboard stats updated
+### Organizations
+- `admin.organizations.list` - List all organizations
+- `admin.organizations.create` - Create new organization
+- `admin.organizations.get` - Get organization details
+
+### Services
+- `admin.services.status` - Get health status of all services
+
+## MVC Structure
+
+- **Models** (`models.py`) - Database models for User and Organization
+- **Views** (`templates/`) - Jinja2 templates with Tailwind CSS
+- **Controllers** (`controllers/`) - Request handlers that communicate with NATS
+- **Services** (`services/`) - NATS client service for messaging
+
+## Default Admin Credentials
+
+- Email: `admin@htpi.com`
+- Password: `changeme123`
 
 ## Deployment
 
-The portal is deployed as a static site on Railway and connects to the Gateway Service via WebSocket.
+The portal is deployed on Railway as a Flask application with Gunicorn.
