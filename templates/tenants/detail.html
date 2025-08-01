@@ -242,8 +242,7 @@
 
 {% block extra_scripts %}
 <script>
-    // Initialize Socket.IO with auth token
-    const socket = initSocket('{{ session_token }}');
+    // Socket is already initialized in base template
     const tenantId = '{{ tenant_id }}';
     let currentTenant = null;
     let tenantUsers = [];
@@ -251,7 +250,7 @@
     
     // Subscribe to tenant data when connected
     socket.on('connect', () => {
-        console.log('Tenant detail page connected to gateway');
+        console.log('Tenant detail page connected to admin portal server');
         
         // Subscribe to tenant updates
         socket.emit('admin:tenant:subscribe', { tenantId });
