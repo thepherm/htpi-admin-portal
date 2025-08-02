@@ -2,6 +2,24 @@
 
 {% block title %}Services - HTPI Admin{% endblock %}
 
+{% block extra_head %}
+<style>
+    /* Ensure proper layout even if JavaScript fails */
+    #frontend-services, #admin-services, #backend-services, #database-services {
+        min-height: 100px;
+    }
+    
+    /* Loading state */
+    .service-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100px;
+        color: #6b7280;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="space-y-6">
     <!-- Header -->
@@ -28,7 +46,13 @@
                 </h2>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="frontend-services">
-                <!-- Services will be populated by JavaScript -->
+                <div class="service-loading">
+                    <svg class="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading services...
+                </div>
             </div>
         </div>
 
@@ -43,7 +67,13 @@
                 </h2>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="admin-services">
-                <!-- Services will be populated by JavaScript -->
+                <div class="service-loading">
+                    <svg class="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading services...
+                </div>
             </div>
         </div>
 
@@ -171,16 +201,27 @@ let natsMetrics = {};
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
     // Wait for socket to be initialized from base.html
-    setTimeout(() => {
+    let retryCount = 0;
+    const maxRetries = 10;
+    
+    function waitForSocket() {
         if (typeof socket !== 'undefined' && socket.connected) {
+            console.log('Socket connected, checking services...');
             checkAllServices();
             setInterval(checkAllServices, 30000); // Check every 30 seconds
+        } else if (retryCount < maxRetries) {
+            retryCount++;
+            console.log('Waiting for socket connection... attempt', retryCount);
+            setTimeout(waitForSocket, 500);
         } else {
-            console.error('Socket not initialized');
+            console.error('Socket not available after', maxRetries, 'attempts');
             // Show mock data if socket not available
             showMockData();
         }
-    }, 500);
+    }
+    
+    // Start waiting for socket
+    waitForSocket();
     
     // Refresh button
     const refreshBtn = document.getElementById('refreshStatus');
@@ -196,6 +237,8 @@ function checkAllServices() {
         return;
     }
     
+    console.log('Checking all services...');
+    
     // Request service status
     socket.emit('services:status:check');
     
@@ -203,32 +246,47 @@ function checkAllServices() {
     socket.emit('services:nats:monitor');
 }
 
-// Socket event handlers
-socket.on('services:status:response', function(data) {
-    if (data.success) {
-        serviceStatus = data.status;
-        updateServiceDisplay();
+// Socket event handlers - set up only when socket is available
+function setupSocketHandlers() {
+    if (typeof socket === 'undefined') {
+        console.warn('Socket not available for event handlers');
+        return;
     }
-});
+    
+    socket.on('services:status:response', function(data) {
+        console.log('Received service status:', data);
+        if (data.success) {
+            serviceStatus = data.status;
+            updateServiceDisplay();
+        }
+    });
+    
+    socket.on('services:nats:monitor:response', function(data) {
+        console.log('Received NATS metrics:', data);
+        if (data.success) {
+            natsMetrics = data.metrics;
+            updateNatsMonitoring();
+        }
+    });
+    
+    // Handle individual service status updates
+    socket.on('services:status:update', function(data) {
+        console.log('Service status update:', data);
+        if (data.serviceId && data.status) {
+            // Update specific service status
+            serviceStatus[data.serviceId] = data.status;
+            updateServiceDisplay();
+        } else if (data.requestId && data.status) {
+            // Update all services from finalized status
+            serviceStatus = data.status;
+            updateServiceDisplay();
+        }
+    });
+}
 
-socket.on('services:nats:monitor:response', function(data) {
-    if (data.success) {
-        natsMetrics = data.metrics;
-        updateNatsMonitoring();
-    }
-});
-
-// Handle individual service status updates
-socket.on('services:status:update', function(data) {
-    if (data.serviceId && data.status) {
-        // Update specific service status
-        serviceStatus[data.serviceId] = data.status;
-        updateServiceDisplay();
-    } else if (data.requestId && data.status) {
-        // Update all services from finalized status
-        serviceStatus = data.status;
-        updateServiceDisplay();
-    }
+// Call setup when document is ready
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(setupSocketHandlers, 1000);
 });
 
 function updateServiceDisplay() {
