@@ -1,0 +1,663 @@
+{% extends "layout.html" %}
+
+{% block title %}Encounters - HTPI Admin Portal{% endblock %}
+
+{% block page_title %}Encounters Management{% endblock %}
+
+{% block page_content %}
+<div class="sm:flex sm:items-center">
+    <div class="sm:flex-auto">
+        <p class="mt-1 text-sm text-gray-700">Manage patient encounters, appointments, and clinical documentation.</p>
+    </div>
+    <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+        <button onclick="showCreateEncounterModal()" class="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700">
+            <i class="fas fa-plus mr-2"></i>New Encounter
+        </button>
+    </div>
+</div>
+
+<!-- Filter Tabs -->
+<div class="mt-6 border-b border-gray-200">
+    <nav class="-mb-px flex space-x-8">
+        <button onclick="filterEncounters('all')" class="encounter-tab active border-indigo-500 text-indigo-600 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+            All Encounters
+        </button>
+        <button onclick="filterEncounters('scheduled')" class="encounter-tab border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+            Scheduled
+        </button>
+        <button onclick="filterEncounters('in-progress')" class="encounter-tab border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+            In Progress
+        </button>
+        <button onclick="filterEncounters('completed')" class="encounter-tab border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+            Completed
+        </button>
+        <button onclick="filterEncounters('billed')" class="encounter-tab border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+            Billed
+        </button>
+    </nav>
+</div>
+
+<!-- Date Filter -->
+<div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-4">
+    <div>
+        <label for="dateFrom" class="block text-sm font-medium text-gray-700">From Date</label>
+        <input type="date" id="dateFrom" onchange="applyDateFilter()" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+    </div>
+    <div>
+        <label for="dateTo" class="block text-sm font-medium text-gray-700">To Date</label>
+        <input type="date" id="dateTo" onchange="applyDateFilter()" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+    </div>
+    <div>
+        <label for="providerFilter" class="block text-sm font-medium text-gray-700">Provider</label>
+        <select id="providerFilter" onchange="applyProviderFilter()" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            <option value="">All Providers</option>
+        </select>
+    </div>
+    <div>
+        <label for="patientSearch" class="block text-sm font-medium text-gray-700">Patient</label>
+        <input type="text" id="patientSearch" placeholder="Search patient..." onkeyup="searchPatients(this.value)" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+    </div>
+</div>
+
+<!-- Encounters Table -->
+<div class="mt-8 flex flex-col">
+    <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
+        <div class="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
+            <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                <table class="min-w-full divide-y divide-gray-300">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Date/Time</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Patient</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Provider</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Type</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Chief Complaint</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Duration</th>
+                            <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                                <span class="sr-only">Actions</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="encountersTableBody" class="divide-y divide-gray-200 bg-white">
+                        <tr>
+                            <td colspan="8" class="text-center py-4">
+                                <i class="fas fa-circle-notch fa-spin text-gray-400 mr-2"></i>
+                                Loading encounters...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Encounter Modal -->
+<div id="createEncounterModal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 overflow-y-auto">
+    <div class="bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-4xl sm:w-full sm:p-6 my-8">
+        <div class="absolute top-0 right-0 pt-4 pr-4">
+            <button onclick="closeCreateEncounterModal()" class="bg-white rounded-md text-gray-400 hover:text-gray-500">
+                <span class="sr-only">Close</span>
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Create New Encounter</h3>
+            <form id="createEncounterForm">
+                <!-- Basic Information -->
+                <div class="bg-blue-50 p-4 rounded-lg mb-6">
+                    <h4 class="text-md font-medium text-gray-900 mb-3">Basic Information</h4>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <label for="encounterPatientId" class="block text-sm font-medium text-gray-700">Patient</label>
+                            <select name="patientId" id="encounterPatientId" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <option value="">Select patient...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="encounterDate" class="block text-sm font-medium text-gray-700">Date & Time</label>
+                            <input type="datetime-local" name="encounterDate" id="encounterDate" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Provider & Visit Details -->
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-6">
+                    <div>
+                        <label for="providerId" class="block text-sm font-medium text-gray-700">Provider</label>
+                        <select name="providerId" id="providerId" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <option value="">Select provider...</option>
+                            <option value="prov-001">Dr. John Smith, MD</option>
+                            <option value="prov-002">Dr. Jane Wilson, MD</option>
+                            <option value="prov-003">Dr. Robert Brown, DO</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="encounterType" class="block text-sm font-medium text-gray-700">Encounter Type</label>
+                        <select name="encounterType" id="encounterType" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <option value="office">Office Visit</option>
+                            <option value="new-patient">New Patient</option>
+                            <option value="follow-up">Follow-up</option>
+                            <option value="consultation">Consultation</option>
+                            <option value="preventive">Preventive Care</option>
+                            <option value="urgent">Urgent Care</option>
+                            <option value="telehealth">Telehealth</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Clinical Information -->
+                <div class="mb-6">
+                    <h4 class="text-md font-medium text-gray-900 mb-3">Clinical Information</h4>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="chiefComplaint" class="block text-sm font-medium text-gray-700">Chief Complaint</label>
+                            <input type="text" name="chiefComplaint" id="chiefComplaint" required placeholder="e.g., Headache, Follow-up for hypertension" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="reasonForVisit" class="block text-sm font-medium text-gray-700">Reason for Visit (Detailed)</label>
+                            <textarea name="reasonForVisit" id="reasonForVisit" rows="3" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vitals -->
+                <div class="mb-6">
+                    <h4 class="text-md font-medium text-gray-900 mb-3">Vital Signs</h4>
+                    <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                        <div>
+                            <label for="vitalBP" class="block text-sm font-medium text-gray-700">Blood Pressure</label>
+                            <input type="text" name="vitalBP" id="vitalBP" placeholder="120/80" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="vitalPulse" class="block text-sm font-medium text-gray-700">Pulse</label>
+                            <input type="number" name="vitalPulse" id="vitalPulse" placeholder="72" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="vitalTemp" class="block text-sm font-medium text-gray-700">Temperature (°F)</label>
+                            <input type="number" step="0.1" name="vitalTemp" id="vitalTemp" placeholder="98.6" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="vitalWeight" class="block text-sm font-medium text-gray-700">Weight (lbs)</label>
+                            <input type="number" name="vitalWeight" id="vitalWeight" placeholder="150" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Initial Status -->
+                <div class="mb-6">
+                    <label for="status" class="block text-sm font-medium text-gray-700">Initial Status</label>
+                    <select name="status" id="status" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <option value="scheduled">Scheduled</option>
+                        <option value="checked-in">Checked In</option>
+                        <option value="in-progress">In Progress</option>
+                    </select>
+                </div>
+
+                <div class="mt-6 flex items-center justify-end space-x-3">
+                    <button type="button" onclick="closeCreateEncounterModal()" class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm">
+                        Cancel
+                    </button>
+                    <button type="submit" id="createEncounterBtn" class="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm">
+                        <i class="fas fa-calendar-check mr-2"></i>Create Encounter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Encounter Detail Modal -->
+<div id="encounterDetailModal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 overflow-y-auto">
+    <div class="bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-5xl sm:w-full sm:p-6 my-8">
+        <div class="absolute top-0 right-0 pt-4 pr-4">
+            <button onclick="closeEncounterDetailModal()" class="bg-white rounded-md text-gray-400 hover:text-gray-500">
+                <span class="sr-only">Close</span>
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="encounterDetailContent">
+            <!-- Content will be dynamically populated -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Socket is already initialized in base template
+    let encounters = [];
+    let patients = [];
+    let currentFilter = 'all';
+    let currentEncounterId = null;
+    
+    // Subscribe to encounters data when connected
+    socket.on('connect', () => {
+        console.log('Encounters page connected to admin portal server');
+        
+        // Subscribe to encounters updates
+        const tenantId = '{{ session.current_tenant.id if session.current_tenant else "all" }}';
+        socket.emit('admin:encounters:subscribe', { tenantId });
+        socket.emit('admin:patients:list:simple', { tenantId });
+    });
+    
+    // Listen for encounters list
+    socket.on('admin:encounters:list', (data) => {
+        encounters = data.encounters || [];
+        renderEncounters();
+    });
+    
+    // Listen for encounter updates
+    socket.on('admin:encounters:update', (data) => {
+        const index = encounters.findIndex(e => e.id === data.encounter.id);
+        if (index >= 0) {
+            encounters[index] = data.encounter;
+            renderEncounters();
+        }
+    });
+    
+    // Listen for patient list
+    socket.on('admin:patients:list:simple', (data) => {
+        patients = data.patients || [];
+        updatePatientDropdown();
+    });
+    
+    function renderEncounters() {
+        const tbody = document.getElementById('encountersTableBody');
+        
+        let filteredEncounters = encounters;
+        if (currentFilter !== 'all') {
+            filteredEncounters = encounters.filter(enc => enc.status === currentFilter);
+        }
+        
+        if (filteredEncounters.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center py-4 text-gray-500">
+                        No encounters found
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = filteredEncounters.map(encounter => `
+            <tr>
+                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+                    <div class="font-medium text-gray-900">${formatDateTime(encounter.encounterDate)}</div>
+                    <div class="text-gray-500">ID: ${encounter.encounterId}</div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
+                    ${encounter.patientName}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    ${encounter.providerName}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    ${getEncounterTypeLabel(encounter.encounterType)}
+                </td>
+                <td class="px-3 py-4 text-sm text-gray-500 max-w-xs truncate">
+                    ${encounter.chiefComplaint}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm">
+                    <span class="inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${getStatusClass(encounter.status)}">
+                        ${getStatusLabel(encounter.status)}
+                    </span>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    ${encounter.duration || '-'} min
+                </td>
+                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                    <button onclick="viewEncounter('${encounter.id}')" class="text-indigo-600 hover:text-indigo-900 mr-3">View</button>
+                    ${encounter.status === 'completed' && !encounter.billed ? 
+                        `<button onclick="createClaimFromEncounter('${encounter.id}')" class="text-green-600 hover:text-green-900">Create Claim</button>` : 
+                        ''}
+                </td>
+            </tr>
+        `).join('');
+    }
+    
+    function getStatusClass(status) {
+        const classes = {
+            'scheduled': 'bg-blue-100 text-blue-800',
+            'checked-in': 'bg-yellow-100 text-yellow-800',
+            'in-progress': 'bg-purple-100 text-purple-800',
+            'completed': 'bg-green-100 text-green-800',
+            'billed': 'bg-gray-100 text-gray-800',
+            'cancelled': 'bg-red-100 text-red-800'
+        };
+        return classes[status] || 'bg-gray-100 text-gray-800';
+    }
+    
+    function getStatusLabel(status) {
+        const labels = {
+            'scheduled': 'Scheduled',
+            'checked-in': 'Checked In',
+            'in-progress': 'In Progress',
+            'completed': 'Completed',
+            'billed': 'Billed',
+            'cancelled': 'Cancelled'
+        };
+        return labels[status] || status;
+    }
+    
+    function getEncounterTypeLabel(type) {
+        const labels = {
+            'office': 'Office Visit',
+            'new-patient': 'New Patient',
+            'follow-up': 'Follow-up',
+            'consultation': 'Consultation',
+            'preventive': 'Preventive Care',
+            'urgent': 'Urgent Care',
+            'telehealth': 'Telehealth'
+        };
+        return labels[type] || type;
+    }
+    
+    function filterEncounters(filter) {
+        currentFilter = filter;
+        
+        // Update tab styles
+        document.querySelectorAll('.encounter-tab').forEach(tab => {
+            tab.classList.remove('border-indigo-500', 'text-indigo-600', 'active');
+            tab.classList.add('border-transparent', 'text-gray-500');
+        });
+        
+        event.target.classList.remove('border-transparent', 'text-gray-500');
+        event.target.classList.add('border-indigo-500', 'text-indigo-600', 'active');
+        
+        renderEncounters();
+    }
+    
+    function updatePatientDropdown() {
+        const select = document.getElementById('encounterPatientId');
+        select.innerHTML = '<option value="">Select patient...</option>' + 
+            patients.map(patient => `
+                <option value="${patient.id}">${patient.lastName}, ${patient.firstName} - ${patient.patientId}</option>
+            `).join('');
+    }
+    
+    function formatDateTime(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleString();
+    }
+    
+    // Modal functions
+    function showCreateEncounterModal() {
+        document.getElementById('createEncounterModal').classList.remove('hidden');
+        // Set default date/time to now
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('encounterDate').value = now.toISOString().slice(0, 16);
+    }
+    
+    function closeCreateEncounterModal() {
+        document.getElementById('createEncounterModal').classList.add('hidden');
+        document.getElementById('createEncounterForm').reset();
+    }
+    
+    function viewEncounter(encounterId) {
+        const encounter = encounters.find(e => e.id === encounterId);
+        if (!encounter) return;
+        
+        currentEncounterId = encounterId;
+        
+        const content = document.getElementById('encounterDetailContent');
+        content.innerHTML = `
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Encounter Details</h3>
+            
+            <!-- Patient & Provider Info -->
+            <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500">Patient</h4>
+                        <p class="mt-1 text-sm text-gray-900">${encounter.patientName}</p>
+                        <p class="text-xs text-gray-600">ID: ${encounter.patientId}</p>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500">Provider</h4>
+                        <p class="mt-1 text-sm text-gray-900">${encounter.providerName}</p>
+                        <p class="text-xs text-gray-600">NPI: ${encounter.providerNPI}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Visit Details -->
+            <div class="mb-6">
+                <h4 class="text-md font-medium text-gray-900 mb-3">Visit Information</h4>
+                <dl class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <dt class="text-gray-500">Date & Time</dt>
+                        <dd class="mt-1 font-medium">${formatDateTime(encounter.encounterDate)}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500">Type</dt>
+                        <dd class="mt-1 font-medium">${getEncounterTypeLabel(encounter.encounterType)}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500">Status</dt>
+                        <dd class="mt-1">
+                            <span class="inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${getStatusClass(encounter.status)}">
+                                ${getStatusLabel(encounter.status)}
+                            </span>
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500">Duration</dt>
+                        <dd class="mt-1 font-medium">${encounter.duration || '-'} minutes</dd>
+                    </div>
+                </dl>
+            </div>
+            
+            <!-- Clinical Information -->
+            <div class="mb-6">
+                <h4 class="text-md font-medium text-gray-900 mb-3">Clinical Information</h4>
+                <dl class="space-y-3 text-sm">
+                    <div>
+                        <dt class="text-gray-500">Chief Complaint</dt>
+                        <dd class="mt-1 font-medium">${encounter.chiefComplaint}</dd>
+                    </div>
+                    ${encounter.reasonForVisit ? `
+                        <div>
+                            <dt class="text-gray-500">Reason for Visit</dt>
+                            <dd class="mt-1 text-gray-900">${encounter.reasonForVisit}</dd>
+                        </div>
+                    ` : ''}
+                </dl>
+            </div>
+            
+            <!-- Vitals -->
+            ${encounter.vitals ? `
+                <div class="mb-6">
+                    <h4 class="text-md font-medium text-gray-900 mb-3">Vital Signs</h4>
+                    <dl class="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+                        ${encounter.vitals.bp ? `
+                            <div>
+                                <dt class="text-gray-500">Blood Pressure</dt>
+                                <dd class="mt-1 font-medium">${encounter.vitals.bp}</dd>
+                            </div>
+                        ` : ''}
+                        ${encounter.vitals.pulse ? `
+                            <div>
+                                <dt class="text-gray-500">Pulse</dt>
+                                <dd class="mt-1 font-medium">${encounter.vitals.pulse} bpm</dd>
+                            </div>
+                        ` : ''}
+                        ${encounter.vitals.temp ? `
+                            <div>
+                                <dt class="text-gray-500">Temperature</dt>
+                                <dd class="mt-1 font-medium">${encounter.vitals.temp}°F</dd>
+                            </div>
+                        ` : ''}
+                        ${encounter.vitals.weight ? `
+                            <div>
+                                <dt class="text-gray-500">Weight</dt>
+                                <dd class="mt-1 font-medium">${encounter.vitals.weight} lbs</dd>
+                            </div>
+                        ` : ''}
+                    </dl>
+                </div>
+            ` : ''}
+            
+            <!-- Actions -->
+            <div class="mt-6 flex justify-end space-x-3">
+                ${encounter.status === 'scheduled' ? `
+                    <button onclick="checkInPatient('${encounter.id}')" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        <i class="fas fa-sign-in-alt mr-2"></i>Check In
+                    </button>
+                ` : ''}
+                ${encounter.status === 'checked-in' ? `
+                    <button onclick="startEncounter('${encounter.id}')" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                        <i class="fas fa-play mr-2"></i>Start Encounter
+                    </button>
+                ` : ''}
+                ${encounter.status === 'in-progress' ? `
+                    <button onclick="completeEncounter('${encounter.id}')" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+                        <i class="fas fa-check mr-2"></i>Complete Encounter
+                    </button>
+                ` : ''}
+                ${encounter.status === 'completed' && !encounter.billed ? `
+                    <button onclick="createClaimFromEncounter('${encounter.id}')" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                        <i class="fas fa-file-invoice-dollar mr-2"></i>Create Claim
+                    </button>
+                ` : ''}
+            </div>
+        `;
+        
+        document.getElementById('encounterDetailModal').classList.remove('hidden');
+    }
+    
+    function closeEncounterDetailModal() {
+        document.getElementById('encounterDetailModal').classList.add('hidden');
+        currentEncounterId = null;
+    }
+    
+    // Create encounter form submission
+    document.getElementById('createEncounterForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const submitBtn = document.getElementById('createEncounterBtn');
+        
+        // Build encounter data
+        const encounterData = {
+            patientId: formData.get('patientId'),
+            encounterDate: formData.get('encounterDate'),
+            providerId: formData.get('providerId'),
+            encounterType: formData.get('encounterType'),
+            chiefComplaint: formData.get('chiefComplaint'),
+            reasonForVisit: formData.get('reasonForVisit'),
+            status: formData.get('status'),
+            vitals: {
+                bp: formData.get('vitalBP'),
+                pulse: formData.get('vitalPulse'),
+                temp: formData.get('vitalTemp'),
+                weight: formData.get('vitalWeight')
+            }
+        };
+        
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating...';
+        
+        // Generate request ID
+        const requestId = Date.now().toString(36) + Math.random().toString(36);
+        
+        // Listen for response
+        socket.once(`admin:encounters:create:response:${requestId}`, (response) => {
+            if (response.success) {
+                closeCreateEncounterModal();
+                showNotification('Encounter created successfully', 'success');
+                // Refresh encounters list
+                socket.emit('admin:encounters:subscribe', { 
+                    tenantId: '{{ session.current_tenant.id if session.current_tenant else "all" }}'
+                });
+            } else {
+                showNotification(response.error || 'Failed to create encounter', 'error');
+            }
+            
+            // Reset button
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-calendar-check mr-2"></i>Create Encounter';
+        });
+        
+        // Add tenant context
+        encounterData.tenantId = '{{ session.current_tenant.id if session.current_tenant else null }}';
+        encounterData.requestId = requestId;
+        
+        // Submit encounter
+        socket.emit('admin:encounters:create', encounterData);
+    });
+    
+    // Encounter status update functions
+    function checkInPatient(encounterId) {
+        updateEncounterStatus(encounterId, 'checked-in');
+    }
+    
+    function startEncounter(encounterId) {
+        updateEncounterStatus(encounterId, 'in-progress');
+    }
+    
+    function completeEncounter(encounterId) {
+        updateEncounterStatus(encounterId, 'completed');
+    }
+    
+    function updateEncounterStatus(encounterId, newStatus) {
+        socket.emit('admin:encounters:update:status', {
+            encounterId: encounterId,
+            status: newStatus,
+            tenantId: '{{ session.current_tenant.id if session.current_tenant else null }}'
+        });
+        
+        closeEncounterDetailModal();
+        showNotification('Encounter status updated', 'success');
+    }
+    
+    function createClaimFromEncounter(encounterId) {
+        // Redirect to claims page with encounter pre-populated
+        window.location.href = `/claims?encounterId=${encounterId}`;
+    }
+    
+    // Initial load with mock data for development
+    if (!socket.connected) {
+        encounters = [
+            {
+                id: 'enc-001',
+                encounterId: 'ENC20240315001',
+                patientId: 'P001234',
+                patientName: 'Doe, John',
+                providerId: 'prov-001',
+                providerName: 'Dr. John Smith, MD',
+                providerNPI: '1234567890',
+                encounterDate: '2024-03-15T09:00:00',
+                encounterType: 'office',
+                chiefComplaint: 'Annual Physical Exam',
+                status: 'completed',
+                duration: 30,
+                vitals: {
+                    bp: '120/80',
+                    pulse: '72',
+                    temp: '98.6',
+                    weight: '180'
+                },
+                billed: false
+            },
+            {
+                id: 'enc-002',
+                encounterId: 'ENC20240315002',
+                patientId: 'P001235',
+                patientName: 'Smith, Jane',
+                providerId: 'prov-002',
+                providerName: 'Dr. Jane Wilson, MD',
+                providerNPI: '0987654321',
+                encounterDate: '2024-03-15T14:30:00',
+                encounterType: 'follow-up',
+                chiefComplaint: 'Follow-up for Hypertension',
+                status: 'scheduled',
+                duration: null
+            }
+        ];
+        renderEncounters();
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,241 @@
+{% extends "layout.html" %}
+
+{% block title %}Switch Tenant - HTPI Admin Portal{% endblock %}
+
+{% block page_title %}Switch Tenant{% endblock %}
+
+{% block page_content %}
+<div class="max-w-4xl mx-auto">
+    <p class="mt-1 text-sm text-gray-700 mb-6">Select a tenant to manage. You have access to all tenants in the system.</p>
+
+    <!-- Current Tenant Display -->
+    {% if session.current_tenant %}
+    <div class="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div class="flex items-center">
+            <i class="fas fa-building text-blue-600 mr-3"></i>
+            <div>
+                <p class="text-sm font-medium text-gray-900">Currently Managing</p>
+                <p class="text-lg font-semibold text-gray-900">{{ session.current_tenant.name }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Search Bar -->
+    <div class="mb-6">
+        <div class="relative">
+            <input type="text" id="tenantSearch" placeholder="Search tenants by name or domain..." 
+                   class="block w-full rounded-md border-gray-300 pr-10 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+                <i class="fas fa-search text-gray-400"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tenant Grid -->
+    <div id="tenantGrid" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div class="col-span-full text-center py-8">
+            <i class="fas fa-circle-notch fa-spin text-gray-400 text-3xl"></i>
+            <p class="mt-2 text-gray-500">Loading tenants...</p>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="mt-8 flex justify-between">
+        <a href="/dashboard" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+            <i class="fas fa-arrow-left mr-2"></i>
+            Back to Dashboard
+        </a>
+        <button onclick="clearTenantSelection()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200">
+            <i class="fas fa-times-circle mr-2"></i>
+            Clear Selection
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Socket is already initialized in base template
+    let allTenants = [];
+    let currentTenantId = '{{ session.current_tenant.id if session.current_tenant else null }}';
+    
+    // Subscribe to tenant data when connected
+    socket.on('connect', () => {
+        console.log('Tenant switch page connected to admin portal server');
+        
+        // Subscribe to tenant updates
+        socket.emit('admin:tenants:subscribe');
+    });
+    
+    // Listen for tenant list
+    socket.on('admin:tenants:list', (tenants) => {
+        allTenants = tenants || [];
+        renderTenants(allTenants);
+    });
+    
+    function renderTenants(tenants) {
+        const grid = document.getElementById('tenantGrid');
+        
+        if (tenants.length === 0) {
+            grid.innerHTML = `
+                <div class="col-span-full text-center py-8">
+                    <i class="fas fa-building text-gray-300 text-5xl mb-4"></i>
+                    <p class="text-gray-500">No tenants found</p>
+                </div>
+            `;
+            return;
+        }
+        
+        grid.innerHTML = tenants.map(tenant => `
+            <div class="bg-white shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer ${tenant.id === currentTenantId ? 'ring-2 ring-indigo-500' : ''}" 
+                 onclick="selectTenant('${tenant.id}')">
+                <div class="p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-medium text-gray-900">${tenant.name}</h3>
+                        ${tenant.id === currentTenantId ? 
+                            '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">Current</span>' : 
+                            ''}
+                    </div>
+                    <dl class="grid grid-cols-1 gap-2 text-sm">
+                        <div>
+                            <dt class="text-gray-500">Domain</dt>
+                            <dd class="font-medium text-gray-900">${tenant.domain || '-'}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-gray-500">Status</dt>
+                            <dd>
+                                <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold leading-5 ${getStatusClass(tenant.status)}">
+                                    ${tenant.status || 'Active'}
+                                </span>
+                            </dd>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mt-2">
+                            <div>
+                                <dt class="text-gray-500">Users</dt>
+                                <dd class="font-medium text-gray-900">${tenant.userCount || 0}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-gray-500">ClaimMD</dt>
+                                <dd class="font-medium text-gray-900">${tenant.claimMDAccounts || 0} accounts</dd>
+                            </div>
+                        </div>
+                    </dl>
+                </div>
+                <div class="bg-gray-50 px-6 py-3">
+                    <button class="w-full text-sm font-medium text-indigo-600 hover:text-indigo-800">
+                        ${tenant.id === currentTenantId ? 'Currently Selected' : 'Select Tenant'}
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    function getStatusClass(status) {
+        const classes = {
+            'Active': 'bg-green-100 text-green-800',
+            'Inactive': 'bg-red-100 text-red-800',
+            'Suspended': 'bg-yellow-100 text-yellow-800'
+        };
+        return classes[status] || 'bg-gray-100 text-gray-800';
+    }
+    
+    function selectTenant(tenantId) {
+        const tenant = allTenants.find(t => t.id === tenantId);
+        if (!tenant) return;
+        
+        // Show confirmation if switching from another tenant
+        if (currentTenantId && currentTenantId !== tenantId) {
+            if (!confirm(`Switch to managing "${tenant.name}"?`)) {
+                return;
+            }
+        }
+        
+        // Generate request ID
+        const requestId = Date.now().toString(36) + Math.random().toString(36);
+        
+        // Listen for response
+        socket.once(`admin:tenant:switch:response:${requestId}`, (response) => {
+            if (response.success) {
+                showNotification(`Switched to ${tenant.name}`, 'success');
+                // Update session and redirect
+                window.location.href = '/dashboard';
+            } else {
+                showNotification(response.error || 'Failed to switch tenant', 'error');
+            }
+        });
+        
+        // Send switch request
+        socket.emit('admin:tenant:switch', {
+            tenantId: tenantId,
+            requestId: requestId
+        });
+    }
+    
+    function clearTenantSelection() {
+        if (!confirm('Clear tenant selection and return to system overview?')) {
+            return;
+        }
+        
+        // Generate request ID
+        const requestId = Date.now().toString(36) + Math.random().toString(36);
+        
+        // Listen for response
+        socket.once(`admin:tenant:switch:response:${requestId}`, (response) => {
+            if (response.success) {
+                showNotification('Tenant selection cleared', 'success');
+                window.location.href = '/dashboard';
+            } else {
+                showNotification(response.error || 'Failed to clear selection', 'error');
+            }
+        });
+        
+        // Send clear request
+        socket.emit('admin:tenant:switch', {
+            tenantId: null,
+            requestId: requestId
+        });
+    }
+    
+    // Search functionality
+    document.getElementById('tenantSearch').addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        const filtered = allTenants.filter(tenant => 
+            tenant.name.toLowerCase().includes(searchTerm) ||
+            (tenant.domain && tenant.domain.toLowerCase().includes(searchTerm))
+        );
+        renderTenants(filtered);
+    });
+    
+    // Mock data for development
+    if (!socket.connected) {
+        allTenants = [
+            {
+                id: 'tenant-001',
+                name: 'Demo Clinic',
+                domain: 'demo.htpi.com',
+                status: 'Active',
+                userCount: 5,
+                claimMDAccounts: 2
+            },
+            {
+                id: 'tenant-002',
+                name: 'Test Hospital',
+                domain: 'test.htpi.com',
+                status: 'Active',
+                userCount: 12,
+                claimMDAccounts: 3
+            },
+            {
+                id: 'tenant-003',
+                name: 'Sample Medical Center',
+                domain: 'sample.htpi.com',
+                status: 'Active',
+                userCount: 8,
+                claimMDAccounts: 1
+            }
+        ];
+        renderTenants(allTenants);
+    }
+</script>
+{% endblock %}

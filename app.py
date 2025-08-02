@@ -4,7 +4,7 @@ HTPI Admin Portal - Flask Application with Socket.IO Server
 import os
 import logging
 import asyncio
-from datetime import timedelta
+from datetime import datetime, timedelta
 from flask import Flask, render_template, redirect, url_for, request, session, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -12,6 +12,7 @@ from functools import wraps
 import nats
 from nats.aio.client import Client as NATS
 import json
+import uuid
 
 # Configure logging
 logging.basicConfig(
@@ -40,6 +41,69 @@ nc = None  # NATS client will be initialized on startup
 
 # Connected clients tracking
 connected_clients = {}
+
+# NATS subjects mapping
+NATS_SUBJECTS = {
+    # Patient service
+    'patient.create': 'htpi.patient.create',
+    'patient.list': 'htpi.patient.list',
+    'patient.get': 'htpi.patient.get',
+    'patient.update': 'htpi.patient.update',
+    'patient.delete': 'htpi.patient.delete',
+    
+    # Insurance service
+    'insurance.create': 'htpi.insurance.create',
+    'insurance.list': 'htpi.insurance.list',
+    'insurance.eligibility.check': 'htpi.insurance.eligibility.check',
+    
+    # Claims service
+    'claims.create': 'htpi.claims.create',
+    'claims.list': 'htpi.claims.list',
+    'claims.upload': 'htpi.claims.upload',
+    'claims.status.check': 'htpi.claims.status.check',
+    
+    # Encounters service
+    'encounters.create': 'htpi.encounters.create',
+    'encounters.list': 'htpi.encounters.list',
+    'encounters.update.status': 'htpi.encounters.update.status',
+    
+    # Tenant service
+    'tenant.create': 'htpi.tenant.create',
+    'tenant.list': 'htpi.tenant.list',
+    'tenant.get': 'htpi.tenant.get',
+    'tenant.switch': 'htpi.tenant.switch',
+    
+    # Auth service
+    'auth.login': 'htpi.auth.login',
+    'auth.verify': 'htpi.auth.verify'
+}
+
+def publish_to_nats(subject_key, data):
+    """
+    Publish message to NATS
+    This is a placeholder for sync mode - in production this would be async
+    """
+    if not nc or not nc.is_connected:
+        logger.warning(f"NATS not connected, cannot publish to {subject_key}")
+        return None
+    
+    try:
+        subject = NATS_SUBJECTS.get(subject_key)
+        if not subject:
+            logger.error(f"Unknown NATS subject key: {subject_key}")
+            return None
+        
+        message = json.dumps(data).encode()
+        logger.info(f"Publishing to NATS {subject}: {data}")
+        
+        # In production, this would be async
+        # response = await nc.request(subject, message, timeout=30)
+        # return json.loads(response.data.decode())
+        
+        return None  # Sync mode limitation
+    except Exception as e:
+        logger.error(f"Error publishing to NATS: {str(e)}")
+        return None
 
 # Authentication decorator
 def login_required(f):
@@ -558,7 +622,7 @@ def handle_add_claimmd(data):
 
 @socketio.on('admin:patients:subscribe')
 def handle_patients_subscribe(data):
-    """Subscribe to patient updates"""
+    """Subscribe to patient updates - forward to NATS"""
     client_id = request.sid
     client = connected_clients.get(client_id)
     tenant_id = data.get('tenantId')
@@ -568,58 +632,37 @@ def handle_patients_subscribe(data):
         return
     
     try:
-        # Join patients room
+        # Join Socket.IO room for this tenant's patients
         room = f"admin:patients:{tenant_id}"
         join_room(room)
         
-        # Send mock patient data for development
-        mock_patients = [
-            {
-                'id': 'pat-001',
-                'patientId': 'P001234',
-                'firstName': 'John',
-                'lastName': 'Doe',
-                'dateOfBirth': '1985-03-15',
-                'gender': 'M',
-                'ssn': 'XXX-XX-1234',
-                'phone': '(555) 123-4567',
-                'email': 'john.doe@email.com',
-                'address': '123 Main St',
-                'city': 'Springfield',
-                'state': 'IL',
-                'zipCode': '62701',
-                'insuranceCount': 2,
-                'tenantId': tenant_id
-            },
-            {
-                'id': 'pat-002',
-                'patientId': 'P001235',
-                'firstName': 'Jane',
-                'lastName': 'Smith',
-                'dateOfBirth': '1990-07-22',
-                'gender': 'F',
-                'ssn': 'XXX-XX-5678',
-                'phone': '(555) 987-6543',
-                'email': 'jane.smith@email.com',
-                'address': '456 Oak Ave',
-                'city': 'Springfield',
-                'state': 'IL',
-                'zipCode': '62702',
-                'insuranceCount': 1,
-                'tenantId': tenant_id
-            }
-        ]
+        # Publish to NATS to get patient list
+        nats_message = {
+            'tenantId': tenant_id,
+            'userId': client['user']['id'],
+            'requestType': 'subscribe',
+            'responseChannel': f"admin.patients.response.{client_id}"
+        }
         
-        emit('admin:patients:list', {'patients': mock_patients})
-        logger.info(f"Admin subscribed to patients for tenant {tenant_id}")
+        # In production, this publishes to NATS and patient service responds
+        result = publish_to_nats('patient.list', nats_message)
+        
+        if result:
+            # Forward NATS response to client
+            emit('admin:patients:list', result)
+        else:
+            # NATS not available - send error
+            emit('admin:patients:list', {'patients': [], 'error': 'Service temporarily unavailable'})
+        
+        logger.info(f"Admin {client['user']['id']} subscribed to patients for tenant {tenant_id}")
         
     except Exception as e:
-        logger.error(f"Error subscribing to patients: {str(e)}")
-        emit('error', {'message': 'Failed to load patients'})
+        logger.error(f"Error in patients subscribe: {str(e)}")
+        emit('error', {'message': 'Failed to subscribe to patients'})
 
 @socketio.on('admin:patients:create')
 def handle_create_patient(data):
-    """Create a new patient"""
+    """Forward patient creation request to NATS"""
     client_id = request.sid
     client = connected_clients.get(client_id)
     
@@ -628,38 +671,555 @@ def handle_create_patient(data):
         return
     
     try:
-        # Generate patient ID
-        import random
-        patient_id = f"P{str(random.randint(100000, 999999))}"
-        
-        # Create patient object
-        new_patient = {
-            'id': f"pat-{random.randint(1000, 9999)}",
-            'patientId': patient_id,
+        # Add context to the request
+        nats_message = {
             **data,
-            'insuranceCount': 0,
             'createdBy': client['user']['id'],
-            'createdAt': '2024-03-15T10:00:00Z'
+            'createdByName': client['user']['name'],
+            'requestId': data.get('requestId'),
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        if nc and nc.is_connected:
+            # Publish to NATS for patient service to handle
+            # The patient service will:
+            # 1. Generate patient ID
+            # 2. Validate data
+            # 3. Save to MongoDB via mongodb service
+            # 4. Publish response back
+            
+            # This is synchronous for now, should be async in production
+            logger.info(f"Publishing patient.create to NATS: {nats_message}")
+            
+            # Mock NATS not available in sync mode
+            emit(f"admin:patients:create:response:{data.get('requestId')}", {
+                'success': False,
+                'error': 'NATS service temporarily unavailable'
+            })
+        else:
+            # NATS not connected
+            emit(f"admin:patients:create:response:{data.get('requestId')}", {
+                'success': False,
+                'error': 'Message broker offline'
+            })
+        
+    except Exception as e:
+        logger.error(f"Error forwarding patient create request: {str(e)}")
+        emit(f"admin:patients:create:response:{data.get('requestId')}", {
+            'success': False,
+            'error': 'Failed to process request'
+        })
+
+@socketio.on('admin:patients:list:simple')
+def handle_patients_list_simple(data):
+    """Get simple patient list for dropdowns"""
+    client_id = request.sid
+    client = connected_clients.get(client_id)
+    tenant_id = data.get('tenantId')
+    
+    if not client or not client.get('authenticated') or client.get('role') != 'admin':
+        emit('error', {'message': 'Admin access required'})
+        return
+    
+    try:
+        # Send mock patient data for development
+        mock_patients = [
+            {
+                'id': 'pat-001',
+                'patientId': 'P001234',
+                'firstName': 'John',
+                'lastName': 'Doe'
+            },
+            {
+                'id': 'pat-002',
+                'patientId': 'P001235',
+                'firstName': 'Jane',
+                'lastName': 'Smith'
+            }
+        ]
+        
+        emit('admin:patients:list:simple', {'patients': mock_patients})
+        
+    except Exception as e:
+        logger.error(f"Error getting patient list: {str(e)}")
+        emit('error', {'message': 'Failed to load patients'})
+
+@socketio.on('admin:encounters:subscribe')
+def handle_encounters_subscribe(data):
+    """Subscribe to encounters updates"""
+    client_id = request.sid
+    client = connected_clients.get(client_id)
+    tenant_id = data.get('tenantId')
+    
+    if not client or not client.get('authenticated') or client.get('role') != 'admin':
+        emit('error', {'message': 'Admin access required'})
+        return
+    
+    try:
+        # Join encounters room
+        room = f"admin:encounters:{tenant_id}"
+        join_room(room)
+        
+        # Send mock encounter data for development
+        mock_encounters = [
+            {
+                'id': 'enc-001',
+                'encounterId': 'ENC20240315001',
+                'patientId': 'P001234',
+                'patientName': 'Doe, John',
+                'providerId': 'prov-001',
+                'providerName': 'Dr. John Smith, MD',
+                'providerNPI': '1234567890',
+                'encounterDate': '2024-03-15T09:00:00',
+                'encounterType': 'office',
+                'chiefComplaint': 'Annual Physical Exam',
+                'status': 'completed',
+                'duration': 30,
+                'vitals': {
+                    'bp': '120/80',
+                    'pulse': '72',
+                    'temp': '98.6',
+                    'weight': '180'
+                },
+                'billed': False,
+                'tenantId': tenant_id
+            },
+            {
+                'id': 'enc-002',
+                'encounterId': 'ENC20240315002',
+                'patientId': 'P001235',
+                'patientName': 'Smith, Jane',
+                'providerId': 'prov-002',
+                'providerName': 'Dr. Jane Wilson, MD',
+                'providerNPI': '0987654321',
+                'encounterDate': '2024-03-15T14:30:00',
+                'encounterType': 'follow-up',
+                'chiefComplaint': 'Follow-up for Hypertension',
+                'status': 'scheduled',
+                'duration': None,
+                'tenantId': tenant_id
+            }
+        ]
+        
+        emit('admin:encounters:list', {'encounters': mock_encounters})
+        logger.info(f"Admin subscribed to encounters for tenant {tenant_id}")
+        
+    except Exception as e:
+        logger.error(f"Error subscribing to encounters: {str(e)}")
+        emit('error', {'message': 'Failed to load encounters'})
+
+@socketio.on('admin:encounters:create')
+def handle_create_encounter(data):
+    """Create a new encounter"""
+    client_id = request.sid
+    client = connected_clients.get(client_id)
+    
+    if not client or not client.get('authenticated') or client.get('role') != 'admin':
+        emit('error', {'message': 'Admin access required'})
+        return
+    
+    try:
+        # Generate encounter ID
+        import random
+        encounter_id = f"ENC{str(random.randint(100000000, 999999999))}"
+        
+        # Get patient info (in production from DB)
+        patient_map = {
+            'pat-001': {'name': 'Doe, John', 'id': 'P001234'},
+            'pat-002': {'name': 'Smith, Jane', 'id': 'P001235'}
+        }
+        patient_info = patient_map.get(data['patientId'], {'name': 'Unknown', 'id': 'Unknown'})
+        
+        # Get provider info
+        provider_map = {
+            'prov-001': {'name': 'Dr. John Smith, MD', 'npi': '1234567890'},
+            'prov-002': {'name': 'Dr. Jane Wilson, MD', 'npi': '0987654321'},
+            'prov-003': {'name': 'Dr. Robert Brown, DO', 'npi': '1122334455'}
+        }
+        provider_info = provider_map.get(data['providerId'], {'name': 'Unknown', 'npi': 'Unknown'})
+        
+        # Create encounter object
+        new_encounter = {
+            'id': f"enc-{random.randint(1000, 9999)}",
+            'encounterId': encounter_id,
+            'patientId': patient_info['id'],
+            'patientName': patient_info['name'],
+            'providerId': data['providerId'],
+            'providerName': provider_info['name'],
+            'providerNPI': provider_info['npi'],
+            'encounterDate': data['encounterDate'],
+            'encounterType': data['encounterType'],
+            'chiefComplaint': data['chiefComplaint'],
+            'reasonForVisit': data.get('reasonForVisit'),
+            'status': data['status'],
+            'vitals': data.get('vitals'),
+            'duration': None,
+            'billed': False,
+            'createdBy': client['user']['id'],
+            'createdAt': '2024-03-15T10:00:00Z',
+            'tenantId': data['tenantId']
         }
         
         # In production, this would be sent to NATS
         # For now, broadcast to admins watching this tenant
-        socketio.emit('admin:patients:created', new_patient, 
-                    room=f"admin:patients:{data['tenantId']}")
+        socketio.emit('admin:encounters:created', new_encounter, 
+                    room=f"admin:encounters:{data['tenantId']}")
         
         # Send success response
-        emit(f"admin:patients:create:response:{data.get('requestId')}", {
+        emit(f"admin:encounters:create:response:{data.get('requestId')}", {
             'success': True,
-            'patient': new_patient
+            'encounter': new_encounter
         })
         
-        logger.info(f"Patient created: {patient_id}")
+        logger.info(f"Encounter created: {encounter_id}")
         
     except Exception as e:
-        logger.error(f"Error creating patient: {str(e)}")
-        emit(f"admin:patients:create:response:{data.get('requestId')}", {
+        logger.error(f"Error creating encounter: {str(e)}")
+        emit(f"admin:encounters:create:response:{data.get('requestId')}", {
             'success': False,
-            'error': 'Failed to create patient'
+            'error': 'Failed to create encounter'
+        })
+
+@socketio.on('admin:encounters:update:status')
+def handle_update_encounter_status(data):
+    """Update encounter status"""
+    client_id = request.sid
+    client = connected_clients.get(client_id)
+    
+    if not client or not client.get('authenticated') or client.get('role') != 'admin':
+        emit('error', {'message': 'Admin access required'})
+        return
+    
+    try:
+        encounter_id = data.get('encounterId')
+        new_status = data.get('status')
+        tenant_id = data.get('tenantId')
+        
+        # In production, this would update via NATS/DB
+        # For now, broadcast the update
+        socketio.emit('admin:encounters:update', {
+            'encounter': {
+                'id': encounter_id,
+                'status': new_status
+            }
+        }, room=f"admin:encounters:{tenant_id}")
+        
+        logger.info(f"Encounter {encounter_id} status updated to {new_status}")
+        
+    except Exception as e:
+        logger.error(f"Error updating encounter status: {str(e)}")
+        emit('error', {'message': 'Failed to update encounter'})
+
+@socketio.on('admin:insurance:subscribe')
+def handle_insurance_subscribe(data):
+    """Subscribe to insurance updates"""
+    client_id = request.sid
+    client = connected_clients.get(client_id)
+    tenant_id = data.get('tenantId')
+    
+    if not client or not client.get('authenticated') or client.get('role') != 'admin':
+        emit('error', {'message': 'Admin access required'})
+        return
+    
+    try:
+        # Join insurance room
+        room = f"admin:insurance:{tenant_id}"
+        join_room(room)
+        
+        # Send mock insurance data for development
+        mock_policies = [
+            {
+                'id': 'ins-001',
+                'patientId': 'P001234',
+                'patientName': 'Doe, John',
+                'payerId': '87726',
+                'payerName': 'United Healthcare',
+                'payerOrder': 'Primary',
+                'policyNumber': 'UHC123456789',
+                'groupNumber': '12345',
+                'effectiveDate': '2024-01-01',
+                'status': 'Active'
+            },
+            {
+                'id': 'ins-002',
+                'patientId': 'P001235',
+                'patientName': 'Smith, Jane',
+                'payerId': '04402',
+                'payerName': 'Medicare',
+                'payerOrder': 'Primary',
+                'policyNumber': '1EG4TE5MK73',
+                'groupNumber': None,
+                'effectiveDate': '2023-06-01',
+                'status': 'Active'
+            }
+        ]
+        
+        emit('admin:insurance:list', {'policies': mock_policies})
+        logger.info(f"Admin subscribed to insurance for tenant {tenant_id}")
+        
+    except Exception as e:
+        logger.error(f"Error subscribing to insurance: {str(e)}")
+        emit('error', {'message': 'Failed to load insurance'})
+
+@socketio.on('admin:insurance:create')
+def handle_create_insurance(data):
+    """Create a new insurance policy"""
+    client_id = request.sid
+    client = connected_clients.get(client_id)
+    
+    if not client or not client.get('authenticated') or client.get('role') != 'admin':
+        emit('error', {'message': 'Admin access required'})
+        return
+    
+    try:
+        # Generate insurance ID
+        import random
+        insurance_id = f"ins-{random.randint(1000, 9999)}"
+        
+        # Get patient info (in production from DB)
+        patient_map = {
+            'pat-001': {'name': 'Doe, John', 'id': 'P001234'},
+            'pat-002': {'name': 'Smith, Jane', 'id': 'P001235'}
+        }
+        patient_info = patient_map.get(data['patientId'], {'name': 'Unknown', 'id': 'Unknown'})
+        
+        # Get payer info
+        payer_map = {
+            '87726': 'United Healthcare',
+            '22099': 'Blue Cross Blue Shield',
+            '60054': 'Aetna',
+            '62308': 'Cigna',
+            '04402': 'Medicare',
+            '86916': 'Medicaid'
+        }
+        
+        # Create insurance object
+        new_insurance = {
+            'id': insurance_id,
+            'patientId': patient_info['id'],
+            'patientName': patient_info['name'],
+            'payerId': data['payerId'],
+            'payerName': payer_map.get(data['payerId'], 'Unknown Payer'),
+            'payerOrder': data['payerOrder'],
+            'policyNumber': data['policyNumber'],
+            'groupNumber': data.get('groupNumber'),
+            'effectiveDate': data['effectiveDate'],
+            'terminationDate': data.get('terminationDate'),
+            'subscriberRelation': data['subscriberRelation'],
+            'subscriberDOB': data.get('subscriberDOB'),
+            'subscriberFirstName': data.get('subscriberFirstName'),
+            'subscriberLastName': data.get('subscriberLastName'),
+            'copayAmount': data.get('copayAmount'),
+            'deductible': data.get('deductible'),
+            'status': 'Active',
+            'createdBy': client['user']['id'],
+            'createdAt': '2024-03-15T10:00:00Z',
+            'tenantId': data['tenantId']
+        }
+        
+        # In production, this would be sent to NATS
+        # For now, broadcast to admins watching this tenant
+        socketio.emit('admin:insurance:created', new_insurance, 
+                    room=f"admin:insurance:{data['tenantId']}")
+        
+        # Send success response
+        emit(f"admin:insurance:create:response:{data.get('requestId')}", {
+            'success': True,
+            'insurance': new_insurance
+        })
+        
+        logger.info(f"Insurance created: {insurance_id}")
+        
+    except Exception as e:
+        logger.error(f"Error creating insurance: {str(e)}")
+        emit(f"admin:insurance:create:response:{data.get('requestId')}", {
+            'success': False,
+            'error': 'Failed to create insurance'
+        })
+
+@socketio.on('admin:insurance:eligibility:check')
+def handle_eligibility_check(data):
+    """Check insurance eligibility via ClaimMD"""
+    client_id = request.sid
+    client = connected_clients.get(client_id)
+    
+    if not client or not client.get('authenticated') or client.get('role') != 'admin':
+        emit('error', {'message': 'Admin access required'})
+        return
+    
+    try:
+        request_id = data.get('requestId')
+        
+        # Mock eligibility response for development
+        # In production, this would call ClaimMD API
+        mock_response = {
+            'requestId': request_id,
+            'success': True,
+            'memberName': 'John Doe',
+            'memberId': data.get('policyNumber', 'UHC123456789'),
+            'groupNumber': data.get('groupNumber', '12345'),
+            'planName': 'PPO Standard',
+            'benefits': [
+                {'description': 'Office Visit', 'coverage': '$20 copay'},
+                {'description': 'Specialist Visit', 'coverage': '$40 copay'},
+                {'description': 'Annual Deductible', 'coverage': '$1,500'},
+                {'description': 'Out of Pocket Max', 'coverage': '$5,000'}
+            ]
+        }
+        
+        # Send response
+        emit('admin:insurance:eligibility:response', mock_response)
+        logger.info(f"Eligibility check performed for request {request_id}")
+        
+    except Exception as e:
+        logger.error(f"Error checking eligibility: {str(e)}")
+        emit('admin:insurance:eligibility:response', {
+            'requestId': data.get('requestId'),
+            'success': False,
+            'error': 'Failed to check eligibility'
+        })
+
+@socketio.on('admin:claims:subscribe')
+def handle_claims_subscribe(data):
+    """Subscribe to claims updates"""
+    client_id = request.sid
+    client = connected_clients.get(client_id)
+    tenant_id = data.get('tenantId')
+    
+    if not client or not client.get('authenticated') or client.get('role') != 'admin':
+        emit('error', {'message': 'Admin access required'})
+        return
+    
+    try:
+        # Join claims room
+        room = f"admin:claims:{tenant_id}"
+        join_room(room)
+        
+        # Send mock claims data for development
+        mock_claims = [
+            {
+                'id': 'clm-001',
+                'claimId': 'CLM20240315001',
+                'pcn': '151068-1',
+                'patientName': 'Doe, John',
+                'serviceDate': '2024-03-15',
+                'payerName': 'Blue Cross Blue Shield',
+                'totalCharge': '165.00',
+                'status': 'Acknowledged',
+                'claimMdId': '396891541'
+            },
+            {
+                'id': 'clm-002',
+                'claimId': 'CLM20240315002',
+                'pcn': '107026-1',
+                'patientName': 'Smith, Jane',
+                'serviceDate': '2024-03-14',
+                'payerName': 'Aetna',
+                'totalCharge': '75.00',
+                'status': 'Paid',
+                'claimMdId': '396891542'
+            }
+        ]
+        
+        emit('admin:claims:list', {'claims': mock_claims})
+        logger.info(f"Admin subscribed to claims for tenant {tenant_id}")
+        
+    except Exception as e:
+        logger.error(f"Error subscribing to claims: {str(e)}")
+        emit('error', {'message': 'Failed to load claims'})
+
+@socketio.on('admin:claims:create')
+def handle_create_claim(data):
+    """Create a new claim and submit to ClaimMD"""
+    client_id = request.sid
+    client = connected_clients.get(client_id)
+    
+    if not client or not client.get('authenticated') or client.get('role') != 'admin':
+        emit('error', {'message': 'Admin access required'})
+        return
+    
+    try:
+        # Generate claim ID
+        import random
+        claim_id = f"CLM{str(random.randint(100000000, 999999999))}"
+        pcn = f"{random.randint(100000, 999999)}-1"
+        
+        # Mock ClaimMD submission response
+        # In production, this would submit to ClaimMD API
+        claimmd_id = str(random.randint(396000000, 396999999))
+        
+        # Send success response
+        emit(f"admin:claims:create:response:{data.get('requestId')}", {
+            'success': True,
+            'claimMdId': claimmd_id,
+            'claimId': claim_id,
+            'pcn': pcn
+        })
+        
+        logger.info(f"Claim created and submitted to ClaimMD: {claim_id}")
+        
+    except Exception as e:
+        logger.error(f"Error creating claim: {str(e)}")
+        emit(f"admin:claims:create:response:{data.get('requestId')}", {
+            'success': False,
+            'error': 'Failed to create claim'
+        })
+
+@socketio.on('admin:tenant:switch')
+def handle_tenant_switch(data):
+    """Switch the active tenant for the admin user"""
+    client_id = request.sid
+    client = connected_clients.get(client_id)
+    
+    if not client or not client.get('authenticated') or client.get('role') != 'admin':
+        emit('error', {'message': 'Admin access required'})
+        return
+    
+    try:
+        tenant_id = data.get('tenantId')
+        request_id = data.get('requestId')
+        
+        if tenant_id:
+            # Mock tenant lookup for development
+            tenant_map = {
+                'tenant-001': {'id': 'tenant-001', 'name': 'Demo Clinic'},
+                'tenant-002': {'id': 'tenant-002', 'name': 'Test Hospital'},
+                'tenant-003': {'id': 'tenant-003', 'name': 'Sample Medical Center'}
+            }
+            
+            tenant = tenant_map.get(tenant_id)
+            if tenant:
+                # Update client's current tenant
+                connected_clients[client_id]['current_tenant'] = tenant
+                
+                # In production, this would update the session via Flask
+                emit(f"admin:tenant:switch:response:{request_id}", {
+                    'success': True,
+                    'tenant': tenant
+                })
+                
+                logger.info(f"Admin {client['user']['email']} switched to tenant {tenant['name']}")
+            else:
+                emit(f"admin:tenant:switch:response:{request_id}", {
+                    'success': False,
+                    'error': 'Tenant not found'
+                })
+        else:
+            # Clear tenant selection
+            connected_clients[client_id]['current_tenant'] = None
+            
+            emit(f"admin:tenant:switch:response:{request_id}", {
+                'success': True,
+                'tenant': None
+            })
+            
+            logger.info(f"Admin {client['user']['email']} cleared tenant selection")
+            
+    except Exception as e:
+        logger.error(f"Error switching tenant: {str(e)}")
+        emit(f"admin:tenant:switch:response:{data.get('requestId')}", {
+            'success': False,
+            'error': 'Failed to switch tenant'
         })
 
 # NATS message handlers for admin updates
@@ -680,6 +1240,65 @@ async def handle_tenant_update(msg):
     except Exception as e:
         logger.error(f"Error handling tenant update: {str(e)}")
 
+# NATS Response Handlers
+async def handle_patient_response(msg):
+    """Handle patient service responses from NATS"""
+    try:
+        data = json.loads(msg.data.decode())
+        response_type = data.get('responseType')
+        client_id = data.get('clientId')
+        
+        if response_type == 'list':
+            # Broadcast to all admins in the tenant room
+            socketio.emit('admin:patients:list', {
+                'patients': data.get('patients', [])
+            }, room=f"admin:patients:{data['tenantId']}")
+            
+        elif response_type == 'created':
+            # Notify specific client and broadcast to room
+            socketio.emit(f"admin:patients:create:response:{data['requestId']}", {
+                'success': True,
+                'patient': data['patient']
+            }, room=client_id)
+            
+            # Broadcast to all admins watching this tenant
+            socketio.emit('admin:patients:created', data['patient'], 
+                        room=f"admin:patients:{data['tenantId']}")
+            
+    except Exception as e:
+        logger.error(f"Error handling patient response: {str(e)}")
+
+async def handle_insurance_response(msg):
+    """Handle insurance service responses from NATS"""
+    try:
+        data = json.loads(msg.data.decode())
+        response_type = data.get('responseType')
+        
+        if response_type == 'eligibility':
+            # Send eligibility results to requesting client
+            socketio.emit('admin:insurance:eligibility:response', data, 
+                        room=data.get('clientId'))
+                        
+    except Exception as e:
+        logger.error(f"Error handling insurance response: {str(e)}")
+
+async def handle_claims_response(msg):
+    """Handle claims service responses from NATS"""
+    try:
+        data = json.loads(msg.data.decode())
+        response_type = data.get('responseType')
+        
+        if response_type == 'status_update':
+            # Broadcast claim status update
+            socketio.emit('admin:claims:status:update', {
+                'claimMdId': data['claimMdId'],
+                'status': data['status'],
+                'message': data.get('message')
+            }, room=f"admin:claims:{data['tenantId']}")
+            
+    except Exception as e:
+        logger.error(f"Error handling claims response: {str(e)}")
+
 # Initialize NATS connection
 async def init_nats():
     """Initialize NATS connection and subscriptions"""
@@ -689,13 +1308,20 @@ async def init_nats():
         nc = await nats.connect(NATS_URL)
         logger.info(f"Connected to NATS at {NATS_URL}")
         
-        # Subscribe to admin-specific topics
+        # Subscribe to response channels from services
+        await nc.subscribe("admin.patients.response.*", cb=handle_patient_response)
+        await nc.subscribe("admin.insurance.response.*", cb=handle_insurance_response)
+        await nc.subscribe("admin.claims.response.*", cb=handle_claims_response)
         await nc.subscribe("admin.tenants.updates", cb=handle_tenant_update)
+        
+        # Subscribe to broadcast channels
+        await nc.subscribe("admin.broadcast.patients.*", cb=handle_patient_response)
+        await nc.subscribe("admin.broadcast.claims.*", cb=handle_claims_response)
         
         logger.info("Admin NATS subscriptions established")
     except Exception as e:
         logger.error(f"Failed to connect to NATS: {str(e)}")
-        logger.warning("Running without NATS - some features will be limited")
+        logger.warning("Running without NATS - services unavailable")
 
 # Error handlers
 @app.errorhandler(404)

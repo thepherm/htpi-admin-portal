@@ -1,0 +1,676 @@
+{% extends "layout.html" %}
+
+{% block title %}Claims Management - HTPI Admin Portal{% endblock %}
+
+{% block page_title %}Claims Management{% endblock %}
+
+{% block page_content %}
+<div class="sm:flex sm:items-center">
+    <div class="sm:flex-auto">
+        <p class="mt-1 text-sm text-gray-700">Submit and manage insurance claims (CMS-1500/HCFA forms) through ClaimMD.</p>
+    </div>
+    <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none space-x-2">
+        <button onclick="showUploadClaimsModal()" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+            <i class="fas fa-upload mr-2"></i>Upload File
+        </button>
+        <button onclick="showCreateClaimModal()" class="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700">
+            <i class="fas fa-plus mr-2"></i>Create Claim
+        </button>
+    </div>
+</div>
+
+<!-- Status Tabs -->
+<div class="mt-6 border-b border-gray-200">
+    <nav class="-mb-px flex space-x-8">
+        <button onclick="filterClaims('all')" class="claim-tab active border-indigo-500 text-indigo-600 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+            All Claims
+        </button>
+        <button onclick="filterClaims('pending')" class="claim-tab border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+            Pending
+        </button>
+        <button onclick="filterClaims('acknowledged')" class="claim-tab border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+            Acknowledged
+        </button>
+        <button onclick="filterClaims('paid')" class="claim-tab border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+            Paid
+        </button>
+        <button onclick="filterClaims('denied')" class="claim-tab border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+            Denied
+        </button>
+    </nav>
+</div>
+
+<!-- Claims Table -->
+<div class="mt-8 flex flex-col">
+    <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
+        <div class="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
+            <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                <table class="min-w-full divide-y divide-gray-300">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Claim ID</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Patient</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">DOS</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Payer</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Amount</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">ClaimMD ID</th>
+                            <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                                <span class="sr-only">Actions</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="claimsTableBody" class="divide-y divide-gray-200 bg-white">
+                        <tr>
+                            <td colspan="8" class="text-center py-4">
+                                <i class="fas fa-circle-notch fa-spin text-gray-400 mr-2"></i>
+                                Loading claims...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Claim Modal (CMS-1500/HCFA Form) -->
+<div id="createClaimModal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 overflow-y-auto">
+    <div class="bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-6xl sm:w-full sm:p-6 my-8">
+        <div class="absolute top-0 right-0 pt-4 pr-4">
+            <button onclick="closeCreateClaimModal()" class="bg-white rounded-md text-gray-400 hover:text-gray-500">
+                <span class="sr-only">Close</span>
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Create New Claim (CMS-1500)</h3>
+            <form id="createClaimForm">
+                <!-- Patient & Insurance Selection -->
+                <div class="bg-blue-50 p-4 rounded-lg mb-6">
+                    <h4 class="text-md font-medium text-gray-900 mb-3">Patient & Insurance</h4>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <label for="claimPatientId" class="block text-sm font-medium text-gray-700">Patient</label>
+                            <select name="patientId" id="claimPatientId" required onchange="loadPatientInsurance(this.value)" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <option value="">Select patient...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="claimInsuranceId" class="block text-sm font-medium text-gray-700">Insurance</label>
+                            <select name="insuranceId" id="claimInsuranceId" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <option value="">Select insurance...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Provider Information -->
+                <div class="mb-6">
+                    <h4 class="text-md font-medium text-gray-900 mb-3">Provider Information</h4>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div>
+                            <label for="providerNPI" class="block text-sm font-medium text-gray-700">Provider NPI</label>
+                            <input type="text" name="providerNPI" id="providerNPI" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="providerTaxId" class="block text-sm font-medium text-gray-700">Tax ID</label>
+                            <input type="text" name="providerTaxId" id="providerTaxId" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="providerTaxonomy" class="block text-sm font-medium text-gray-700">Taxonomy</label>
+                            <input type="text" name="providerTaxonomy" id="providerTaxonomy" placeholder="e.g., 208D00000X" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Diagnosis Codes -->
+                <div class="mb-6">
+                    <h4 class="text-md font-medium text-gray-900 mb-3">Diagnosis Codes (ICD-10)</h4>
+                    <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                        <div>
+                            <label for="diag1" class="block text-sm font-medium text-gray-700">Primary</label>
+                            <input type="text" name="diag1" id="diag1" required placeholder="e.g., M79.3" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="diag2" class="block text-sm font-medium text-gray-700">Secondary</label>
+                            <input type="text" name="diag2" id="diag2" placeholder="Optional" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="diag3" class="block text-sm font-medium text-gray-700">Tertiary</label>
+                            <input type="text" name="diag3" id="diag3" placeholder="Optional" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="diag4" class="block text-sm font-medium text-gray-700">Quaternary</label>
+                            <input type="text" name="diag4" id="diag4" placeholder="Optional" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Service Lines -->
+                <div class="mb-6">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="text-md font-medium text-gray-900">Service Lines</h4>
+                        <button type="button" onclick="addServiceLine()" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+                            <i class="fas fa-plus mr-1"></i>Add Line
+                        </button>
+                    </div>
+                    <div id="serviceLines" class="space-y-4">
+                        <!-- Service line template will be added here -->
+                    </div>
+                </div>
+
+                <!-- Claim Totals -->
+                <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                    <div class="flex justify-between items-center">
+                        <span class="text-lg font-medium text-gray-900">Total Charges:</span>
+                        <span id="totalCharges" class="text-xl font-bold text-gray-900">$0.00</span>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex items-center justify-end space-x-3">
+                    <button type="button" onclick="closeCreateClaimModal()" class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm">
+                        Cancel
+                    </button>
+                    <button type="submit" id="createClaimBtn" class="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm">
+                        <i class="fas fa-paper-plane mr-2"></i>Submit Claim
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Claims Modal -->
+<div id="uploadClaimsModal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-lg sm:w-full sm:p-6">
+        <div class="absolute top-0 right-0 pt-4 pr-4">
+            <button onclick="closeUploadClaimsModal()" class="bg-white rounded-md text-gray-400 hover:text-gray-500">
+                <span class="sr-only">Close</span>
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Upload Claim File</h3>
+            <form id="uploadClaimsForm">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Supported formats:</label>
+                    <ul class="text-sm text-gray-600 list-disc list-inside">
+                        <li>837P/837I (X12)</li>
+                        <li>CSV, JSON, XML</li>
+                        <li>XLS, XLSX</li>
+                    </ul>
+                </div>
+                <div class="mb-4">
+                    <label for="claimFile" class="block text-sm font-medium text-gray-700">Select File</label>
+                    <input type="file" name="claimFile" id="claimFile" required accept=".txt,.x12,.csv,.json,.xml,.xls,.xlsx" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                </div>
+                <div class="mt-5 sm:mt-6">
+                    <button type="submit" id="uploadClaimsBtn" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm">
+                        Upload to ClaimMD
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Service Line Template -->
+<template id="serviceLineTemplate">
+    <div class="service-line border border-gray-200 rounded-lg p-4">
+        <div class="flex justify-between items-start mb-3">
+            <h5 class="text-sm font-medium text-gray-900">Service Line <span class="line-number">1</span></h5>
+            <button type="button" onclick="removeServiceLine(this)" class="text-red-600 hover:text-red-800 text-sm">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-6">
+            <div>
+                <label class="block text-xs font-medium text-gray-700">DOS From</label>
+                <input type="date" name="fromDate[]" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700">DOS To</label>
+                <input type="date" name="toDate[]" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700">CPT Code</label>
+                <input type="text" name="cptCode[]" required placeholder="99213" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700">Modifiers</label>
+                <input type="text" name="modifiers[]" placeholder="25" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700">Units</label>
+                <input type="number" name="units[]" required value="1" min="1" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700">Charge</label>
+                <input type="number" step="0.01" name="charge[]" required placeholder="0.00" onchange="updateTotalCharges()" class="charge-input mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-medium text-gray-700">POS</label>
+                <select name="placeOfService[]" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <option value="11">Office</option>
+                    <option value="21">Inpatient Hospital</option>
+                    <option value="22">Outpatient Hospital</option>
+                    <option value="23">Emergency Room</option>
+                    <option value="31">Skilled Nursing Facility</option>
+                    <option value="32">Nursing Facility</option>
+                    <option value="12">Home</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700">Diag Pointers</label>
+                <input type="text" name="diagPointers[]" placeholder="1,2" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+        </div>
+    </div>
+</template>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Socket is already initialized in base template
+    let claims = [];
+    let patients = [];
+    let patientInsurance = {};
+    let currentFilter = 'all';
+    
+    // Subscribe to claims data when connected
+    socket.on('connect', () => {
+        console.log('Claims page connected to admin portal server');
+        
+        // Subscribe to claims updates
+        const tenantId = '{{ session.current_tenant.id if session.current_tenant else "all" }}';
+        socket.emit('admin:claims:subscribe', { tenantId });
+        socket.emit('admin:patients:list:simple', { tenantId });
+    });
+    
+    // Listen for claims list
+    socket.on('admin:claims:list', (data) => {
+        claims = data.claims || [];
+        renderClaims();
+    });
+    
+    // Listen for claim status updates
+    socket.on('admin:claims:status:update', (data) => {
+        const claim = claims.find(c => c.claimMdId === data.claimMdId);
+        if (claim) {
+            claim.status = data.status;
+            claim.statusMessage = data.message;
+            renderClaims();
+        }
+    });
+    
+    // Listen for patient list
+    socket.on('admin:patients:list:simple', (data) => {
+        patients = data.patients || [];
+        updatePatientDropdown();
+    });
+    
+    // Listen for patient insurance
+    socket.on('admin:patient:insurance:list', (data) => {
+        patientInsurance[data.patientId] = data.insurance || [];
+        updateInsuranceDropdown(data.patientId);
+    });
+    
+    function renderClaims() {
+        const tbody = document.getElementById('claimsTableBody');
+        
+        let filteredClaims = claims;
+        if (currentFilter !== 'all') {
+            filteredClaims = claims.filter(claim => claim.status.toLowerCase() === currentFilter);
+        }
+        
+        if (filteredClaims.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center py-4 text-gray-500">
+                        No claims found
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = filteredClaims.map(claim => `
+            <tr>
+                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+                    <div class="font-medium text-gray-900">${claim.claimId}</div>
+                    <div class="text-gray-500">PCN: ${claim.pcn}</div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
+                    ${claim.patientName}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    ${formatDate(claim.serviceDate)}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    ${claim.payerName}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
+                    $${parseFloat(claim.totalCharge).toFixed(2)}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm">
+                    <span class="inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${getStatusClass(claim.status)}">
+                        ${claim.status}
+                    </span>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    ${claim.claimMdId || '-'}
+                </td>
+                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                    <button onclick="viewClaim('${claim.id}')" class="text-indigo-600 hover:text-indigo-900 mr-3">View</button>
+                    <button onclick="getClaimStatus('${claim.claimMdId}')" class="text-blue-600 hover:text-blue-900">Status</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+    
+    function getStatusClass(status) {
+        const classes = {
+            'pending': 'bg-yellow-100 text-yellow-800',
+            'acknowledged': 'bg-blue-100 text-blue-800',
+            'paid': 'bg-green-100 text-green-800',
+            'denied': 'bg-red-100 text-red-800',
+            'rejected': 'bg-red-100 text-red-800'
+        };
+        return classes[status.toLowerCase()] || 'bg-gray-100 text-gray-800';
+    }
+    
+    function filterClaims(filter) {
+        currentFilter = filter;
+        
+        // Update tab styles
+        document.querySelectorAll('.claim-tab').forEach(tab => {
+            tab.classList.remove('border-indigo-500', 'text-indigo-600', 'active');
+            tab.classList.add('border-transparent', 'text-gray-500');
+        });
+        
+        event.target.classList.remove('border-transparent', 'text-gray-500');
+        event.target.classList.add('border-indigo-500', 'text-indigo-600', 'active');
+        
+        renderClaims();
+    }
+    
+    function updatePatientDropdown() {
+        const select = document.getElementById('claimPatientId');
+        select.innerHTML = '<option value="">Select patient...</option>' + 
+            patients.map(patient => `
+                <option value="${patient.id}">${patient.lastName}, ${patient.firstName} - ${patient.patientId}</option>
+            `).join('');
+    }
+    
+    function loadPatientInsurance(patientId) {
+        if (!patientId) {
+            document.getElementById('claimInsuranceId').innerHTML = '<option value="">Select insurance...</option>';
+            return;
+        }
+        
+        // Request patient's insurance
+        socket.emit('admin:patient:insurance:request', { 
+            patientId,
+            tenantId: '{{ session.current_tenant.id if session.current_tenant else null }}'
+        });
+    }
+    
+    function updateInsuranceDropdown(patientId) {
+        const select = document.getElementById('claimInsuranceId');
+        const insurance = patientInsurance[patientId] || [];
+        
+        if (insurance.length === 0) {
+            select.innerHTML = '<option value="">No insurance on file</option>';
+        } else {
+            select.innerHTML = '<option value="">Select insurance...</option>' +
+                insurance.map(ins => `
+                    <option value="${ins.id}">${ins.payerName} - ${ins.policyNumber} (${ins.payerOrder})</option>
+                `).join('');
+        }
+    }
+    
+    // Modal functions
+    function showCreateClaimModal() {
+        document.getElementById('createClaimModal').classList.remove('hidden');
+        // Add initial service line
+        addServiceLine();
+    }
+    
+    function closeCreateClaimModal() {
+        document.getElementById('createClaimModal').classList.add('hidden');
+        document.getElementById('createClaimForm').reset();
+        document.getElementById('serviceLines').innerHTML = '';
+        updateTotalCharges();
+    }
+    
+    function showUploadClaimsModal() {
+        document.getElementById('uploadClaimsModal').classList.remove('hidden');
+    }
+    
+    function closeUploadClaimsModal() {
+        document.getElementById('uploadClaimsModal').classList.add('hidden');
+        document.getElementById('uploadClaimsForm').reset();
+    }
+    
+    // Service line management
+    let serviceLineCount = 0;
+    
+    function addServiceLine() {
+        serviceLineCount++;
+        const template = document.getElementById('serviceLineTemplate');
+        const clone = template.content.cloneNode(true);
+        
+        // Update line number
+        clone.querySelector('.line-number').textContent = serviceLineCount;
+        
+        // Set today's date as default
+        const today = new Date().toISOString().split('T')[0];
+        clone.querySelector('input[name="fromDate[]"]').value = today;
+        
+        document.getElementById('serviceLines').appendChild(clone);
+    }
+    
+    function removeServiceLine(button) {
+        if (document.querySelectorAll('.service-line').length > 1) {
+            button.closest('.service-line').remove();
+            updateServiceLineNumbers();
+            updateTotalCharges();
+        } else {
+            showNotification('At least one service line is required', 'warning');
+        }
+    }
+    
+    function updateServiceLineNumbers() {
+        document.querySelectorAll('.line-number').forEach((span, index) => {
+            span.textContent = index + 1;
+        });
+        serviceLineCount = document.querySelectorAll('.service-line').length;
+    }
+    
+    function updateTotalCharges() {
+        const charges = document.querySelectorAll('.charge-input');
+        let total = 0;
+        
+        charges.forEach(input => {
+            const value = parseFloat(input.value) || 0;
+            total += value;
+        });
+        
+        document.getElementById('totalCharges').textContent = '$' + total.toFixed(2);
+    }
+    
+    // Create claim form submission
+    document.getElementById('createClaimForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const submitBtn = document.getElementById('createClaimBtn');
+        
+        // Build claim data structure for ClaimMD
+        const claimData = {
+            patientId: formData.get('patientId'),
+            insuranceId: formData.get('insuranceId'),
+            providerNPI: formData.get('providerNPI'),
+            providerTaxId: formData.get('providerTaxId'),
+            providerTaxonomy: formData.get('providerTaxonomy'),
+            diag1: formData.get('diag1'),
+            diag2: formData.get('diag2'),
+            diag3: formData.get('diag3'),
+            diag4: formData.get('diag4'),
+            charges: []
+        };
+        
+        // Collect service lines
+        const fromDates = formData.getAll('fromDate[]');
+        const toDates = formData.getAll('toDate[]');
+        const cptCodes = formData.getAll('cptCode[]');
+        const modifiers = formData.getAll('modifiers[]');
+        const units = formData.getAll('units[]');
+        const charges = formData.getAll('charge[]');
+        const placeOfService = formData.getAll('placeOfService[]');
+        const diagPointers = formData.getAll('diagPointers[]');
+        
+        for (let i = 0; i < fromDates.length; i++) {
+            claimData.charges.push({
+                from_date: fromDates[i],
+                thru_date: toDates[i] || fromDates[i],
+                proc_code: cptCodes[i],
+                modifiers: modifiers[i],
+                units: units[i],
+                charge: charges[i],
+                place_of_service: placeOfService[i],
+                diag_ref: diagPointers[i] || '1'
+            });
+        }
+        
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Submitting to ClaimMD...';
+        
+        // Generate request ID
+        const requestId = Date.now().toString(36) + Math.random().toString(36);
+        
+        // Listen for response
+        socket.once(`admin:claims:create:response:${requestId}`, (response) => {
+            if (response.success) {
+                closeCreateClaimModal();
+                showNotification(`Claim submitted successfully. ClaimMD ID: ${response.claimMdId}`, 'success');
+                // Refresh claims list
+                socket.emit('admin:claims:subscribe', { 
+                    tenantId: '{{ session.current_tenant.id if session.current_tenant else "all" }}'
+                });
+            } else {
+                showNotification(response.error || 'Failed to submit claim', 'error');
+            }
+            
+            // Reset button
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Submit Claim';
+        });
+        
+        // Add tenant context
+        claimData.tenantId = '{{ session.current_tenant.id if session.current_tenant else null }}';
+        claimData.requestId = requestId;
+        
+        // Submit claim
+        socket.emit('admin:claims:create', claimData);
+    });
+    
+    // Upload claims form submission
+    document.getElementById('uploadClaimsForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const file = formData.get('claimFile');
+        const submitBtn = document.getElementById('uploadClaimsBtn');
+        
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Uploading...';
+        
+        // Read file content
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const fileContent = event.target.result;
+            const requestId = Date.now().toString(36) + Math.random().toString(36);
+            
+            // Listen for response
+            socket.once(`admin:claims:upload:response:${requestId}`, (response) => {
+                if (response.success) {
+                    closeUploadClaimsModal();
+                    showNotification(`File uploaded successfully. ${response.claimCount} claims processed.`, 'success');
+                    // Refresh claims list
+                    socket.emit('admin:claims:subscribe', { 
+                        tenantId: '{{ session.current_tenant.id if session.current_tenant else "all" }}'
+                    });
+                } else {
+                    showNotification(response.error || 'Failed to upload file', 'error');
+                }
+                
+                // Reset button
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Upload to ClaimMD';
+            });
+            
+            // Submit file
+            socket.emit('admin:claims:upload', {
+                filename: file.name,
+                content: fileContent,
+                tenantId: '{{ session.current_tenant.id if session.current_tenant else null }}',
+                requestId: requestId
+            });
+        };
+        
+        reader.readAsText(file);
+    });
+    
+    function getClaimStatus(claimMdId) {
+        if (!claimMdId || claimMdId === '-') {
+            showNotification('No ClaimMD ID available for this claim', 'warning');
+            return;
+        }
+        
+        showNotification('Checking claim status...', 'info');
+        
+        socket.emit('admin:claims:status:check', {
+            claimMdId: claimMdId,
+            tenantId: '{{ session.current_tenant.id if session.current_tenant else null }}'
+        });
+    }
+    
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString();
+    }
+    
+    // Initial load with mock data for development
+    if (!socket.connected) {
+        claims = [
+            {
+                id: 'clm-001',
+                claimId: 'CLM20240315001',
+                pcn: '151068-1',
+                patientName: 'Doe, John',
+                serviceDate: '2024-03-15',
+                payerName: 'Blue Cross Blue Shield',
+                totalCharge: '165.00',
+                status: 'Acknowledged',
+                claimMdId: '396891541'
+            },
+            {
+                id: 'clm-002',
+                claimId: 'CLM20240315002',
+                pcn: '107026-1',
+                patientName: 'Smith, Jane',
+                serviceDate: '2024-03-14',
+                payerName: 'Aetna',
+                totalCharge: '75.00',
+                status: 'Paid',
+                claimMdId: '396891542'
+            }
+        ];
+        renderClaims();
+    }
+</script>
+{% endblock %}

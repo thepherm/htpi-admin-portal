@@ -1,0 +1,577 @@
+{% extends "layout.html" %}
+
+{% block title %}Insurance Management - HTPI Admin Portal{% endblock %}
+
+{% block page_title %}Insurance Management{% endblock %}
+
+{% block page_content %}
+<div class="sm:flex sm:items-center">
+    <div class="sm:flex-auto">
+        <p class="mt-1 text-sm text-gray-700">Manage insurance policies and verify eligibility for patients.</p>
+    </div>
+    <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none space-x-2">
+        <button onclick="showPayerListModal()" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+            <i class="fas fa-list mr-2"></i>View Payers
+        </button>
+        <button onclick="showAddInsuranceModal()" class="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700">
+            <i class="fas fa-plus mr-2"></i>Add Insurance
+        </button>
+    </div>
+</div>
+
+<!-- Search Bar -->
+<div class="mt-4">
+    <div class="relative">
+        <input type="text" id="patientSearch" placeholder="Search by patient name or ID..." class="block w-full rounded-md border-gray-300 pr-10 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+        <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+            <i class="fas fa-search text-gray-400"></i>
+        </div>
+    </div>
+</div>
+
+<!-- Insurance Cards Grid -->
+<div class="mt-8">
+    <div id="insuranceGrid" class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="text-center py-12 col-span-full">
+            <i class="fas fa-circle-notch fa-spin text-gray-400 text-3xl"></i>
+            <p class="mt-2 text-gray-500">Loading insurance policies...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Add Insurance Modal -->
+<div id="addInsuranceModal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 overflow-y-auto">
+    <div class="bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-3xl sm:w-full sm:p-6 my-8">
+        <div class="absolute top-0 right-0 pt-4 pr-4">
+            <button onclick="closeAddInsuranceModal()" class="bg-white rounded-md text-gray-400 hover:text-gray-500">
+                <span class="sr-only">Close</span>
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Add Insurance Policy</h3>
+            <form id="addInsuranceForm">
+                <!-- Patient Selection -->
+                <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Patient</label>
+                    <select name="patientId" id="patientSelect" required class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <option value="">Select a patient...</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+                    <!-- Payer Information -->
+                    <div class="sm:col-span-2">
+                        <h4 class="text-md font-medium text-gray-900 mb-3">Payer Information</h4>
+                    </div>
+                    
+                    <div>
+                        <label for="payerId" class="block text-sm font-medium text-gray-700">Payer</label>
+                        <select name="payerId" id="payerId" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <option value="">Select payer...</option>
+                            <option value="87726">United Healthcare</option>
+                            <option value="22099">Blue Cross Blue Shield</option>
+                            <option value="60054">Aetna</option>
+                            <option value="62308">Cigna</option>
+                            <option value="04402">Medicare</option>
+                            <option value="86916">Medicaid</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="payerOrder" class="block text-sm font-medium text-gray-700">Payer Order</label>
+                        <select name="payerOrder" id="payerOrder" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <option value="Primary">Primary</option>
+                            <option value="Secondary">Secondary</option>
+                            <option value="Tertiary">Tertiary</option>
+                        </select>
+                    </div>
+
+                    <!-- Policy Information -->
+                    <div class="sm:col-span-2 mt-4">
+                        <h4 class="text-md font-medium text-gray-900 mb-3">Policy Information</h4>
+                    </div>
+                    
+                    <div>
+                        <label for="policyNumber" class="block text-sm font-medium text-gray-700">Policy/ID Number</label>
+                        <input type="text" name="policyNumber" id="policyNumber" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    
+                    <div>
+                        <label for="groupNumber" class="block text-sm font-medium text-gray-700">Group Number</label>
+                        <input type="text" name="groupNumber" id="groupNumber" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    
+                    <div>
+                        <label for="effectiveDate" class="block text-sm font-medium text-gray-700">Effective Date</label>
+                        <input type="date" name="effectiveDate" id="effectiveDate" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    
+                    <div>
+                        <label for="terminationDate" class="block text-sm font-medium text-gray-700">Termination Date</label>
+                        <input type="date" name="terminationDate" id="terminationDate" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+
+                    <!-- Subscriber Information -->
+                    <div class="sm:col-span-2 mt-4">
+                        <h4 class="text-md font-medium text-gray-900 mb-3">Subscriber Information</h4>
+                    </div>
+                    
+                    <div>
+                        <label for="subscriberRelation" class="block text-sm font-medium text-gray-700">Relationship to Patient</label>
+                        <select name="subscriberRelation" id="subscriberRelation" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <option value="18">Self</option>
+                            <option value="01">Spouse</option>
+                            <option value="19">Child</option>
+                            <option value="G8">Other Dependent</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="subscriberDOB" class="block text-sm font-medium text-gray-700">Subscriber DOB</label>
+                        <input type="date" name="subscriberDOB" id="subscriberDOB" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    
+                    <div id="subscriberNameFields" class="sm:col-span-2 hidden">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="subscriberFirstName" class="block text-sm font-medium text-gray-700">Subscriber First Name</label>
+                                <input type="text" name="subscriberFirstName" id="subscriberFirstName" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="subscriberLastName" class="block text-sm font-medium text-gray-700">Subscriber Last Name</label>
+                                <input type="text" name="subscriberLastName" id="subscriberLastName" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Coverage Details -->
+                    <div class="sm:col-span-2 mt-4">
+                        <h4 class="text-md font-medium text-gray-900 mb-3">Coverage Details</h4>
+                    </div>
+                    
+                    <div>
+                        <label for="copayAmount" class="block text-sm font-medium text-gray-700">Copay Amount</label>
+                        <input type="number" step="0.01" name="copayAmount" id="copayAmount" placeholder="0.00" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    
+                    <div>
+                        <label for="deductible" class="block text-sm font-medium text-gray-700">Deductible</label>
+                        <input type="number" step="0.01" name="deductible" id="deductible" placeholder="0.00" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                </div>
+
+                <div class="mt-6 flex items-center justify-between">
+                    <button type="button" onclick="verifyEligibility()" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        Verify Eligibility
+                    </button>
+                    
+                    <div class="flex space-x-3">
+                        <button type="button" onclick="closeAddInsuranceModal()" class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm">
+                            Cancel
+                        </button>
+                        <button type="submit" id="addInsuranceBtn" class="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm">
+                            Add Insurance
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Eligibility Results Modal -->
+<div id="eligibilityModal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-4xl sm:w-full sm:p-6 max-h-screen overflow-y-auto">
+        <div class="absolute top-0 right-0 pt-4 pr-4">
+            <button onclick="closeEligibilityModal()" class="bg-white rounded-md text-gray-400 hover:text-gray-500">
+                <span class="sr-only">Close</span>
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Eligibility Verification Results</h3>
+            <div id="eligibilityResults" class="space-y-4">
+                <!-- Results will be populated here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payer List Modal -->
+<div id="payerListModal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-6xl sm:w-full sm:p-6 max-h-screen overflow-y-auto">
+        <div class="absolute top-0 right-0 pt-4 pr-4">
+            <button onclick="closePayerListModal()" class="bg-white rounded-md text-gray-400 hover:text-gray-500">
+                <span class="sr-only">Close</span>
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Available Payers</h3>
+            <div class="mb-4">
+                <input type="text" id="payerSearch" placeholder="Search payers..." class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            </div>
+            <div id="payerListResults" class="overflow-x-auto">
+                <!-- Payer list will be populated here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Socket is already initialized in base template
+    let insurancePolicies = [];
+    let patients = [];
+    let payers = [];
+    
+    // Subscribe to insurance data when connected
+    socket.on('connect', () => {
+        console.log('Insurance page connected to admin portal server');
+        
+        // Subscribe to insurance updates
+        const tenantId = '{{ session.current_tenant.id if session.current_tenant else "all" }}';
+        socket.emit('admin:insurance:subscribe', { tenantId });
+        socket.emit('admin:patients:list:simple', { tenantId }); // Get patient list for dropdown
+    });
+    
+    // Listen for insurance list
+    socket.on('admin:insurance:list', (data) => {
+        insurancePolicies = data.policies || [];
+        renderInsurancePolicies();
+    });
+    
+    // Listen for patient list
+    socket.on('admin:patients:list:simple', (data) => {
+        patients = data.patients || [];
+        updatePatientDropdown();
+    });
+    
+    // Listen for payer list
+    socket.on('admin:payers:list', (data) => {
+        payers = data.payers || [];
+        renderPayerList();
+    });
+    
+    // Listen for eligibility results
+    socket.on('admin:insurance:eligibility:response', (data) => {
+        if (data.requestId === currentEligibilityRequest) {
+            displayEligibilityResults(data);
+        }
+    });
+    
+    function renderInsurancePolicies() {
+        const grid = document.getElementById('insuranceGrid');
+        
+        if (insurancePolicies.length === 0) {
+            grid.innerHTML = `
+                <div class="col-span-full text-center py-12">
+                    <i class="fas fa-shield-alt text-gray-300 text-5xl mb-4"></i>
+                    <p class="text-gray-500">No insurance policies found</p>
+                    <p class="text-sm text-gray-400 mt-2">Add insurance policies for your patients</p>
+                </div>
+            `;
+            return;
+        }
+        
+        grid.innerHTML = insurancePolicies.map(policy => `
+            <div class="bg-white shadow rounded-lg overflow-hidden">
+                <div class="px-6 py-4 bg-${policy.payerOrder === 'Primary' ? 'indigo' : policy.payerOrder === 'Secondary' ? 'blue' : 'gray'}-50">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-medium text-gray-900">${policy.patientName}</h3>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${policy.payerOrder === 'Primary' ? 'indigo' : policy.payerOrder === 'Secondary' ? 'blue' : 'gray'}-100 text-${policy.payerOrder === 'Primary' ? 'indigo' : policy.payerOrder === 'Secondary' ? 'blue' : 'gray'}-800">
+                            ${policy.payerOrder}
+                        </span>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-1">Patient ID: ${policy.patientId}</p>
+                </div>
+                <div class="px-6 py-4">
+                    <div class="flex items-center mb-3">
+                        <img src="/static/images/payers/${policy.payerId}.png" alt="${policy.payerName}" class="h-8 w-auto mr-3" onerror="this.style.display='none'">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">${policy.payerName}</p>
+                            <p class="text-xs text-gray-500">Payer ID: ${policy.payerId}</p>
+                        </div>
+                    </div>
+                    <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                        <div>
+                            <dt class="text-gray-500">Policy #</dt>
+                            <dd class="font-medium text-gray-900">${policy.policyNumber}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-gray-500">Group #</dt>
+                            <dd class="font-medium text-gray-900">${policy.groupNumber || '-'}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-gray-500">Effective</dt>
+                            <dd class="font-medium text-gray-900">${formatDate(policy.effectiveDate)}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-gray-500">Status</dt>
+                            <dd class="font-medium">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${policy.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                    ${policy.status}
+                                </span>
+                            </dd>
+                        </div>
+                    </dl>
+                    <div class="mt-4 flex justify-between">
+                        <button onclick="checkEligibility('${policy.id}')" class="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
+                            Check Eligibility
+                        </button>
+                        <div class="space-x-3">
+                            <button onclick="editInsurance('${policy.id}')" class="text-gray-600 hover:text-gray-900 text-sm">
+                                Edit
+                            </button>
+                            <button onclick="deleteInsurance('${policy.id}')" class="text-red-600 hover:text-red-900 text-sm">
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    function updatePatientDropdown() {
+        const select = document.getElementById('patientSelect');
+        select.innerHTML = '<option value="">Select a patient...</option>' + 
+            patients.map(patient => `
+                <option value="${patient.id}">${patient.lastName}, ${patient.firstName} - ${patient.patientId}</option>
+            `).join('');
+    }
+    
+    // Show/hide subscriber fields based on relationship
+    document.getElementById('subscriberRelation').addEventListener('change', (e) => {
+        const subscriberFields = document.getElementById('subscriberNameFields');
+        if (e.target.value !== '18') { // Not self
+            subscriberFields.classList.remove('hidden');
+            document.getElementById('subscriberFirstName').required = true;
+            document.getElementById('subscriberLastName').required = true;
+        } else {
+            subscriberFields.classList.add('hidden');
+            document.getElementById('subscriberFirstName').required = false;
+            document.getElementById('subscriberLastName').required = false;
+        }
+    });
+    
+    // Modal functions
+    function showAddInsuranceModal() {
+        document.getElementById('addInsuranceModal').classList.remove('hidden');
+    }
+    
+    function closeAddInsuranceModal() {
+        document.getElementById('addInsuranceModal').classList.add('hidden');
+        document.getElementById('addInsuranceForm').reset();
+    }
+    
+    function showPayerListModal() {
+        document.getElementById('payerListModal').classList.remove('hidden');
+        // Request payer list from ClaimMD
+        socket.emit('admin:payers:request', { 
+            tenantId: '{{ session.current_tenant.id if session.current_tenant else null }}'
+        });
+    }
+    
+    function closePayerListModal() {
+        document.getElementById('payerListModal').classList.add('hidden');
+    }
+    
+    function closeEligibilityModal() {
+        document.getElementById('eligibilityModal').classList.add('hidden');
+    }
+    
+    let currentEligibilityRequest = null;
+    
+    function verifyEligibility() {
+        const form = document.getElementById('addInsuranceForm');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        
+        // Generate request ID
+        currentEligibilityRequest = Date.now().toString(36) + Math.random().toString(36);
+        
+        // Show loading
+        showNotification('Checking eligibility with ClaimMD...', 'info');
+        
+        // Send eligibility request
+        socket.emit('admin:insurance:eligibility:check', {
+            ...data,
+            requestId: currentEligibilityRequest,
+            tenantId: '{{ session.current_tenant.id if session.current_tenant else null }}'
+        });
+    }
+    
+    function displayEligibilityResults(data) {
+        const modal = document.getElementById('eligibilityModal');
+        const results = document.getElementById('eligibilityResults');
+        
+        if (data.error) {
+            showNotification(data.error, 'error');
+            return;
+        }
+        
+        // Parse and display eligibility results
+        results.innerHTML = `
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h4 class="text-lg font-medium text-green-900 mb-2">Coverage Active</h4>
+                <dl class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <dt class="text-gray-500">Member Name</dt>
+                        <dd class="font-medium">${data.memberName}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500">Member ID</dt>
+                        <dd class="font-medium">${data.memberId}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500">Group Number</dt>
+                        <dd class="font-medium">${data.groupNumber || '-'}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500">Plan Name</dt>
+                        <dd class="font-medium">${data.planName}</dd>
+                    </div>
+                </dl>
+            </div>
+            
+            ${data.benefits ? `
+                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                    <h4 class="text-lg font-medium text-gray-900 mb-2">Benefits</h4>
+                    <div class="space-y-2">
+                        ${data.benefits.map(benefit => `
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">${benefit.description}</span>
+                                <span class="font-medium">${benefit.coverage}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+        `;
+        
+        modal.classList.remove('hidden');
+    }
+    
+    function checkEligibility(policyId) {
+        const policy = insurancePolicies.find(p => p.id === policyId);
+        if (!policy) return;
+        
+        currentEligibilityRequest = Date.now().toString(36) + Math.random().toString(36);
+        
+        showNotification('Checking eligibility with ClaimMD...', 'info');
+        
+        socket.emit('admin:insurance:eligibility:check', {
+            policyId: policyId,
+            requestId: currentEligibilityRequest,
+            tenantId: '{{ session.current_tenant.id if session.current_tenant else null }}'
+        });
+    }
+    
+    // Add insurance form submission
+    document.getElementById('addInsuranceForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const insuranceData = Object.fromEntries(formData);
+        const addBtn = document.getElementById('addInsuranceBtn');
+        
+        // Show loading state
+        addBtn.disabled = true;
+        addBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Adding...';
+        
+        // Generate request ID
+        const requestId = Date.now().toString(36) + Math.random().toString(36);
+        
+        // Listen for response
+        socket.once(`admin:insurance:create:response:${requestId}`, (response) => {
+            if (response.success) {
+                closeAddInsuranceModal();
+                showNotification('Insurance policy added successfully', 'success');
+                // Refresh list
+                socket.emit('admin:insurance:subscribe', { 
+                    tenantId: '{{ session.current_tenant.id if session.current_tenant else "all" }}'
+                });
+            } else {
+                showNotification(response.error || 'Failed to add insurance', 'error');
+            }
+            
+            // Reset button
+            addBtn.disabled = false;
+            addBtn.innerHTML = 'Add Insurance';
+        });
+        
+        // Add tenant context
+        const tenantId = '{{ session.current_tenant.id if session.current_tenant else null }}';
+        
+        // Emit the request
+        socket.emit('admin:insurance:create', { 
+            ...insuranceData, 
+            tenantId,
+            requestId 
+        });
+    });
+    
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString();
+    }
+    
+    // Search functionality
+    document.getElementById('patientSearch').addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        const filtered = insurancePolicies.filter(policy => 
+            policy.patientName.toLowerCase().includes(searchTerm) ||
+            policy.patientId.toLowerCase().includes(searchTerm) ||
+            policy.policyNumber.toLowerCase().includes(searchTerm)
+        );
+        
+        // Re-render with filtered results
+        const grid = document.getElementById('insuranceGrid');
+        if (filtered.length === 0) {
+            grid.innerHTML = `
+                <div class="col-span-full text-center py-12">
+                    <p class="text-gray-500">No insurance policies match your search</p>
+                </div>
+            `;
+        } else {
+            // Use same rendering logic but with filtered array
+            insurancePolicies = filtered;
+            renderInsurancePolicies();
+        }
+    });
+    
+    // Initial load with mock data for development
+    if (!socket.connected) {
+        insurancePolicies = [
+            {
+                id: 'ins-001',
+                patientId: 'P001234',
+                patientName: 'Doe, John',
+                payerId: '87726',
+                payerName: 'United Healthcare',
+                payerOrder: 'Primary',
+                policyNumber: 'UHC123456789',
+                groupNumber: '12345',
+                effectiveDate: '2024-01-01',
+                status: 'Active'
+            },
+            {
+                id: 'ins-002',
+                patientId: 'P001235',
+                patientName: 'Smith, Jane',
+                payerId: '04402',
+                payerName: 'Medicare',
+                payerOrder: 'Primary',
+                policyNumber: '1EG4TE5MK73',
+                groupNumber: null,
+                effectiveDate: '2023-06-01',
+                status: 'Active'
+            }
+        ];
+        renderInsurancePolicies();
+    }
+</script>
+{% endblock %}
