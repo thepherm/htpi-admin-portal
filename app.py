@@ -13,6 +13,8 @@ import nats
 from nats.aio.client import Client as NATS
 import json
 import uuid
+import requests
+import concurrent.futures
 
 # Configure logging
 logging.basicConfig(
@@ -251,6 +253,18 @@ def encounters():
 def switch_tenant():
     return render_template('tenants/switch.html',
                          user=session.get('user'))
+
+@app.route('/health')
+def health_check():
+    """Health check endpoint for monitoring"""
+    health_status = {
+        'status': 'healthy',
+        'service': 'htpi-admin-portal',
+        'timestamp': datetime.utcnow().isoformat(),
+        'nats_connected': nc.is_connected if nc else False,
+        'standalone_mode': STANDALONE_MODE
+    }
+    return jsonify(health_status), 200
 
 # Session management endpoint
 @app.route('/auth/session', methods=['POST'])
@@ -1287,6 +1301,194 @@ def handle_tenant_switch(data):
         emit(f"admin:tenant:switch:response:{data.get('requestId')}", {
             'success': False,
             'error': 'Failed to switch tenant'
+        })
+
+# Service monitoring handlers
+@socketio.on('services:status:check')
+def handle_service_status_check():
+    """Check status of all services"""
+    client_id = request.sid
+    client = connected_clients.get(client_id)
+    
+    if not client or not client.get('authenticated') or client.get('role') != 'admin':
+        emit('error', {'message': 'Admin access required'})
+        return
+    
+    try:
+        import requests
+        import concurrent.futures
+        
+        service_status = {}
+        
+        # Service endpoints to check
+        services = [
+            {'id': 'htpi-admin-portal', 'url': 'http://localhost:5001/health', 'type': 'portal'},
+            {'id': 'htpi-customer-portal', 'url': 'http://localhost:5000/health', 'type': 'portal'},
+            {'id': 'htpi-gateway-service', 'url': 'http://localhost:8000/health', 'type': 'gateway'},
+            {'id': 'htpi-admin-service', 'url': 'http://localhost:8001/health', 'type': 'service'},
+            {'id': 'htpi-auth-service', 'url': 'http://localhost:8002/health', 'type': 'service'},
+            {'id': 'htpi-tenant-service', 'url': 'http://localhost:8003/health', 'type': 'service'},
+            {'id': 'htpi-patients-service', 'url': 'http://localhost:8004/health', 'type': 'service'},
+            {'id': 'htpi-insurance-service', 'url': 'http://localhost:8005/health', 'type': 'service'},
+            {'id': 'htpi-dashboard-service', 'url': 'http://localhost:8006/health', 'type': 'service'},
+            {'id': 'htpi-encounters-service', 'url': 'http://localhost:8007/health', 'type': 'service'},
+            {'id': 'htpi-mongodb-service', 'url': 'http://localhost:8008/health', 'type': 'service'},
+            {'id': 'htpi-nats', 'url': 'http://localhost:8222/varz', 'type': 'infrastructure'}
+        ]
+        
+        def check_service(service):
+            try:
+                if STANDALONE_MODE:
+                    # Mock healthy status in standalone mode
+                    return {
+                        'id': service['id'],
+                        'status': 'healthy',
+                        'message': 'Mock status - standalone mode',
+                        'lastChecked': datetime.utcnow().isoformat()
+                    }
+                    
+                # In production, use Railway internal URLs
+                if os.environ.get('ENV') == 'production':
+                    service['url'] = service['url'].replace('localhost', f"{service['id']}.railway.internal")
+                
+                response = requests.get(service['url'], timeout=5)
+                status = 'healthy' if response.status_code == 200 else 'down'
+                message = 'Service operational' if status == 'healthy' else f'HTTP {response.status_code}'
+                
+                return {
+                    'id': service['id'],
+                    'status': status,
+                    'message': message,
+                    'lastChecked': datetime.utcnow().isoformat()
+                }
+            except requests.exceptions.ConnectionError:
+                return {
+                    'id': service['id'],
+                    'status': 'down',
+                    'message': 'Service unavailable',
+                    'lastChecked': datetime.utcnow().isoformat()
+                }
+            except Exception as e:
+                return {
+                    'id': service['id'],
+                    'status': 'unknown',
+                    'message': str(e),
+                    'lastChecked': datetime.utcnow().isoformat()
+                }
+        
+        # Check services in parallel
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            results = executor.map(check_service, services)
+            
+        for result in results:
+            service_status[result['id']] = result
+        
+        # Special handling for MongoDB
+        service_status['mongodb'] = {
+            'status': 'healthy' if service_status.get('htpi-mongodb-service', {}).get('status') == 'healthy' else 'down',
+            'message': 'Database operational' if service_status.get('htpi-mongodb-service', {}).get('status') == 'healthy' else 'Database unavailable',
+            'lastChecked': datetime.utcnow().isoformat()
+        }
+        
+        emit('services:status:response', {
+            'success': True,
+            'status': service_status
+        })
+        
+    except Exception as e:
+        logger.error(f"Error checking service status: {str(e)}")
+        emit('services:status:response', {
+            'success': False,
+            'error': str(e)
+        })
+
+@socketio.on('services:nats:monitor')
+def handle_nats_monitor():
+    """Get NATS monitoring data"""
+    client_id = request.sid
+    client = connected_clients.get(client_id)
+    
+    if not client or not client.get('authenticated') or client.get('role') != 'admin':
+        emit('error', {'message': 'Admin access required'})
+        return
+    
+    try:
+        import requests
+        
+        if STANDALONE_MODE:
+            # Mock NATS metrics
+            mock_metrics = {
+                'connections': 12,
+                'in_msgs': 1524367,
+                'out_msgs': 1523891,
+                'subscriptions': 148,
+                'connz': {
+                    'connections': [
+                        {
+                            'cid': 1,
+                            'name': 'htpi-admin-portal',
+                            'subscriptions': 24,
+                            'pending_bytes': 0,
+                            'in_msgs': 125431,
+                            'out_msgs': 125098
+                        },
+                        {
+                            'cid': 2,
+                            'name': 'htpi-patients-service',
+                            'subscriptions': 18,
+                            'pending_bytes': 0,
+                            'in_msgs': 98234,
+                            'out_msgs': 98156
+                        },
+                        {
+                            'cid': 3,
+                            'name': 'htpi-gateway-service',
+                            'subscriptions': 32,
+                            'pending_bytes': 0,
+                            'in_msgs': 234567,
+                            'out_msgs': 234123
+                        }
+                    ]
+                }
+            }
+            
+            emit('services:nats:monitor:response', {
+                'success': True,
+                'metrics': mock_metrics
+            })
+            return
+        
+        # Get NATS monitoring URL
+        nats_monitor_url = 'http://localhost:8222'
+        if os.environ.get('ENV') == 'production':
+            nats_monitor_url = 'http://htpi-nats.railway.internal:8222'
+        
+        # Fetch varz (general stats)
+        varz_response = requests.get(f'{nats_monitor_url}/varz', timeout=5)
+        varz = varz_response.json() if varz_response.status_code == 200 else {}
+        
+        # Fetch connz (connection details)
+        connz_response = requests.get(f'{nats_monitor_url}/connz', timeout=5)
+        connz = connz_response.json() if connz_response.status_code == 200 else {}
+        
+        metrics = {
+            'connections': varz.get('connections', 0),
+            'in_msgs': varz.get('in_msgs', 0),
+            'out_msgs': varz.get('out_msgs', 0),
+            'subscriptions': varz.get('subscriptions', 0),
+            'connz': connz
+        }
+        
+        emit('services:nats:monitor:response', {
+            'success': True,
+            'metrics': metrics
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching NATS monitoring data: {str(e)}")
+        emit('services:nats:monitor:response', {
+            'success': False,
+            'error': str(e)
         })
 
 # NATS message handlers for admin updates

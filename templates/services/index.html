@@ -1,92 +1,460 @@
 {% extends "layout.html" %}
 
-{% block title %}Services - HTPI Admin Portal{% endblock %}
+{% block title %}Services - HTPI Admin{% endblock %}
 
-{% block page_title %}Service Status{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-semibold text-gray-900">Service Status</h1>
+        <button id="refreshStatus" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+            <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            Refresh Status
+        </button>
+    </div>
 
-{% block page_content %}
+    <!-- Service Groups -->
+    <div class="space-y-6">
+        <!-- Frontend Services -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-medium text-gray-900 flex items-center">
+                    <svg class="mr-2 h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                    </svg>
+                    Frontend Services
+                </h2>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="frontend-services">
+                <!-- Services will be populated by JavaScript -->
+            </div>
+        </div>
 
-<!-- Services Grid -->
-<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-    {% for service_name, service_info in services.items() %}
-    <div class="bg-white overflow-hidden shadow rounded-lg">
-        <div class="p-6">
-            <div class="flex items-center justify-between">
+        <!-- Admin, Auth & Tenant Services -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-medium text-gray-900 flex items-center">
+                    <svg class="mr-2 h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                    </svg>
+                    Admin, Auth & Tenant Services
+                </h2>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="admin-services">
+                <!-- Services will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- NATS Message Broker -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-medium text-gray-900 flex items-center">
+                    <svg class="mr-2 h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    NATS Message Broker
+                </h2>
+            </div>
+            <div id="nats-service">
+                <!-- NATS status will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Backend MicroServices -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-medium text-gray-900 flex items-center">
+                    <svg class="mr-2 h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                    </svg>
+                    Backend MicroServices
+                </h2>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4" id="backend-services">
+                <!-- Services will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Database Service -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-medium text-gray-900 flex items-center">
+                    <svg class="mr-2 h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                    </svg>
+                    Database Service
+                </h2>
+            </div>
+            <div id="database-services">
+                <!-- Database services will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Infrastructure Status -->
+        <div class="bg-gray-900 text-white shadow rounded-lg p-6">
+            <h2 class="text-lg font-medium mb-4">Infrastructure Status</h2>
+            
+            <div class="space-y-4">
                 <div>
-                    <h3 class="text-lg font-medium text-gray-900">{{ service_name|title }} Service</h3>
-                    <p class="mt-1 text-sm text-gray-500">{{ service_info.message }}</p>
+                    <h3 class="text-base font-medium mb-2">NATS Message Broker</h3>
+                    <p class="text-gray-400 text-sm mb-3">The NATS message broker enables communication between all microservices.</p>
+                    <div id="nats-infrastructure-status">
+                        <!-- NATS detailed status will be populated here -->
+                    </div>
                 </div>
-                <div class="flex-shrink-0">
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                        {% if service_info.healthy %}bg-green-100 text-green-800
-                        {% else %}bg-red-100 text-red-800{% endif %}">
-                        {% if service_info.healthy %}
-                            <i class="fas fa-check-circle mr-1"></i> Healthy
-                        {% else %}
-                            <i class="fas fa-exclamation-circle mr-1"></i> Down
-                        {% endif %}
-                    </span>
+            </div>
+        </div>
+
+        <!-- NATS Real-time Monitoring -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-lg font-medium text-gray-900 mb-4">NATS Real-time Monitoring</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="nats-metrics">
+                <!-- Real-time metrics will be populated by JavaScript -->
+            </div>
+            <div class="mt-6">
+                <h3 class="text-base font-medium text-gray-900 mb-3">Connected Clients</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subscriptions</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pending</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Messages</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="nats-clients">
+                            <!-- Clients will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Service definitions
+const services = {
+    frontend: [
+        { id: 'htpi-admin-portal', name: 'htpi-admin-portal', repo: 'htpi-admin-portal', type: 'portal' },
+        { id: 'htpi-gateway-service', name: 'htpi-gateway-service', repo: 'htpi-gateway-service-production', type: 'gateway' },
+        { id: 'htpi-customer-portal', name: 'htpi-customer-portal', repo: 'htpi-customer-portal', type: 'portal' }
+    ],
+    admin: [
+        { id: 'htpi-admin-service', name: 'htpi-admin-service', type: 'service' },
+        { id: 'htpi-auth-service', name: 'htpi-auth-service', type: 'service' },
+        { id: 'htpi-tenant-service', name: 'htpi-tenant-service', type: 'service' }
+    ],
+    nats: [
+        { id: 'htpi-nats', name: 'htpi-nats', type: 'infrastructure' }
+    ],
+    backend: [
+        { id: 'htpi-patients-service', name: 'htpi-patients-service', type: 'service' },
+        { id: 'htpi-insurance-service', name: 'htpi-insurance-service', type: 'service' },
+        { id: 'htpi-dashboard-service', name: 'htpi-dashboard-service', type: 'service' },
+        { id: 'htpi-encounters-service', name: 'htpi-encounters-service', type: 'service' }
+    ],
+    database: [
+        { id: 'htpi-mongodb-service', name: 'htpi-mongodb-service', type: 'service' },
+        { id: 'mongodb', name: 'MongoDB', type: 'database' }
+    ]
+};
+
+// Service status cache
+let serviceStatus = {};
+let natsMetrics = {};
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    checkAllServices();
+    setInterval(checkAllServices, 30000); // Check every 30 seconds
+    
+    // Refresh button
+    document.getElementById('refreshStatus').addEventListener('click', checkAllServices);
+});
+
+function checkAllServices() {
+    // Request service status
+    socket.emit('services:status:check');
+    
+    // Request NATS monitoring data
+    socket.emit('services:nats:monitor');
+}
+
+// Socket event handlers
+socket.on('services:status:response', function(data) {
+    if (data.success) {
+        serviceStatus = data.status;
+        updateServiceDisplay();
+    }
+});
+
+socket.on('services:nats:monitor:response', function(data) {
+    if (data.success) {
+        natsMetrics = data.metrics;
+        updateNatsMonitoring();
+    }
+});
+
+function updateServiceDisplay() {
+    // Update frontend services
+    updateServiceGroup('frontend-services', services.frontend);
+    
+    // Update admin services
+    updateServiceGroup('admin-services', services.admin);
+    
+    // Update backend services
+    updateServiceGroup('backend-services', services.backend);
+    
+    // Update database services
+    updateDatabaseServices();
+    
+    // Update NATS service
+    updateNatsService();
+}
+
+function updateServiceGroup(containerId, serviceList) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    
+    serviceList.forEach(service => {
+        const status = serviceStatus[service.id] || { status: 'unknown', message: 'Checking...' };
+        const card = createServiceCard(service, status);
+        container.appendChild(card);
+    });
+}
+
+function createServiceCard(service, status) {
+    const div = document.createElement('div');
+    div.className = 'border rounded-lg p-4';
+    
+    const statusColor = getStatusColor(status.status);
+    const statusIcon = getStatusIcon(status.status);
+    
+    div.innerHTML = `
+        <div class="flex items-start justify-between">
+            <div class="flex-1">
+                <div class="flex items-center">
+                    ${statusIcon}
+                    <h3 class="ml-2 text-sm font-medium text-gray-900">${service.name}</h3>
+                </div>
+                <p class="mt-1 text-sm text-gray-500">${status.message || 'Unknown status'}</p>
+            </div>
+        </div>
+        <div class="mt-3 flex items-center text-xs text-gray-500">
+            <svg class="mr-1 h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            ${status.lastChecked ? new Date(status.lastChecked).toLocaleTimeString() : 'Never'}
+        </div>
+    `;
+    
+    return div;
+}
+
+function updateNatsService() {
+    const container = document.getElementById('nats-service');
+    const natsStatus = serviceStatus['htpi-nats'] || { status: 'unknown' };
+    
+    container.innerHTML = `
+        <div class="border rounded-lg p-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    ${getStatusIcon(natsStatus.status)}
+                    <div class="ml-3">
+                        <p class="text-sm font-medium text-gray-900">NATS Server</p>
+                        <p class="text-sm text-gray-500">${natsStatus.message || 'Checking status...'}</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs text-gray-500">Port: 4222</p>
+                    <p class="text-xs text-gray-500">Monitoring: 8222</p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Update infrastructure status
+    const infraContainer = document.getElementById('nats-infrastructure-status');
+    const statusClass = natsStatus.status === 'healthy' ? 'text-green-400' : 'text-red-400';
+    infraContainer.innerHTML = `
+        <div class="flex items-center">
+            <svg class="mr-2 h-5 w-5 ${statusClass}" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="${statusClass}">Connected</span>
+        </div>
+    `;
+}
+
+function updateDatabaseServices() {
+    const container = document.getElementById('database-services');
+    const mongoService = serviceStatus['htpi-mongodb-service'] || { status: 'unknown' };
+    const mongoDb = serviceStatus['mongodb'] || { status: 'unknown' };
+    
+    container.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="border rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        ${getStatusIcon(mongoService.status)}
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-900">htpi-mongodb-service</p>
+                            <p class="text-sm text-gray-500">${mongoService.message || 'Checking...'}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 text-xs text-gray-500">
+                    <svg class="inline mr-1 h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    ${mongoService.lastChecked ? new Date(mongoService.lastChecked).toLocaleTimeString() : 'Never'}
                 </div>
             </div>
             
-            <!-- Service Details -->
-            <div class="mt-4 border-t pt-4">
-                <dl class="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
-                    <div class="sm:col-span-1">
-                        <dt class="text-xs font-medium text-gray-500">Status</dt>
-                        <dd class="mt-1 text-sm text-gray-900">
-                            {% if service_info.healthy %}Operational{% else %}Not Responding{% endif %}
-                        </dd>
+            <div class="border rounded-lg p-4 bg-gray-50">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <div class="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
+                            <svg class="h-6 w-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M3 12v3c0 1.657 3.134 3 7 3s7-1.343 7-3v-3c0 1.657-3.134 3-7 3s-7-1.343-7-3z"/>
+                                <path d="M3 7v3c0 1.657 3.134 3 7 3s7-1.343 7-3V7c0 1.657-3.134 3-7 3S3 8.657 3 7z"/>
+                                <path d="M17 5c0 1.657-3.134 3-7 3S3 6.657 3 5s3.134-3 7-3 7 1.343 7 3z"/>
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-900">MongoDB</p>
+                            <p class="text-sm text-gray-500">Database operational</p>
+                        </div>
                     </div>
-                    <div class="sm:col-span-1">
-                        <dt class="text-xs font-medium text-gray-500">Type</dt>
-                        <dd class="mt-1 text-sm text-gray-900">
-                            {% if service_name == 'gateway' %}API Gateway
-                            {% elif service_name == 'admin' %}Administration
-                            {% elif service_name == 'patient' %}Patient Management
-                            {% elif service_name == 'insurance' %}Insurance Processing
-                            {% elif service_name == 'form' %}Form Management
-                            {% elif service_name == 'claim' %}Claims Processing
-                            {% else %}Microservice{% endif %}
-                        </dd>
+                </div>
+                <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                        <p class="text-gray-500">Storage</p>
+                        <p class="font-medium">grand-volume</p>
                     </div>
-                </dl>
+                    <div>
+                        <p class="text-gray-500">Type</p>
+                        <p class="font-medium">Docker Image</p>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-    {% endfor %}
-</div>
+    `;
+}
 
-<!-- NATS Status -->
-<div class="mt-8">
-    <h2 class="text-lg font-medium text-gray-900 mb-4">Infrastructure Status</h2>
-    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div class="px-4 py-5 sm:p-6">
-            <h3 class="text-lg leading-6 font-medium text-gray-900">NATS Message Broker</h3>
-            <div class="mt-2 max-w-xl text-sm text-gray-500">
-                <p>The NATS message broker enables communication between all microservices.</p>
-            </div>
-            <div class="mt-3">
-                <span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium 
-                    {% if services.gateway.healthy or services.admin.healthy %}bg-green-100 text-green-800
-                    {% else %}bg-red-100 text-red-800{% endif %}">
-                    {% if services.gateway.healthy or services.admin.healthy %}
-                        <i class="fas fa-check-circle mr-1"></i> Connected
-                    {% else %}
-                        <i class="fas fa-exclamation-circle mr-1"></i> Disconnected
-                    {% endif %}
-                </span>
+function updateNatsMonitoring() {
+    // Update metrics
+    const metricsContainer = document.getElementById('nats-metrics');
+    metricsContainer.innerHTML = `
+        <div class="bg-blue-50 rounded-lg p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-blue-900">Connections</p>
+                    <p class="text-2xl font-semibold text-blue-600">${natsMetrics.connections || 0}</p>
+                </div>
+                <svg class="h-8 w-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
             </div>
         </div>
-    </div>
-</div>
+        
+        <div class="bg-green-50 rounded-lg p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-green-900">Messages In</p>
+                    <p class="text-2xl font-semibold text-green-600">${formatNumber(natsMetrics.in_msgs || 0)}</p>
+                </div>
+                <svg class="h-8 w-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16l-4-4m0 0l4-4m-4 4h18"></path>
+                </svg>
+            </div>
+        </div>
+        
+        <div class="bg-purple-50 rounded-lg p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-purple-900">Messages Out</p>
+                    <p class="text-2xl font-semibold text-purple-600">${formatNumber(natsMetrics.out_msgs || 0)}</p>
+                </div>
+                <svg class="h-8 w-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path>
+                </svg>
+            </div>
+        </div>
+        
+        <div class="bg-yellow-50 rounded-lg p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-yellow-900">Subscriptions</p>
+                    <p class="text-2xl font-semibold text-yellow-600">${natsMetrics.subscriptions || 0}</p>
+                </div>
+                <svg class="h-8 w-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                </svg>
+            </div>
+        </div>
+    `;
+    
+    // Update clients table
+    const clientsContainer = document.getElementById('nats-clients');
+    clientsContainer.innerHTML = '';
+    
+    if (natsMetrics.connz && natsMetrics.connz.connections) {
+        natsMetrics.connz.connections.forEach(conn => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${conn.cid}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${conn.name || 'Anonymous'}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${conn.subscriptions || 0}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${conn.pending_bytes || 0}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatNumber(conn.in_msgs || 0)} / ${formatNumber(conn.out_msgs || 0)}</td>
+            `;
+            clientsContainer.appendChild(tr);
+        });
+    }
+}
 
-<!-- Refresh Button -->
-<div class="mt-6 text-right">
-    <button onclick="location.reload();" 
-            class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-        <i class="fas fa-sync-alt mr-2"></i>
-        Refresh Status
-    </button>
-</div>
+function getStatusColor(status) {
+    switch(status) {
+        case 'healthy': return 'text-green-600 bg-green-100';
+        case 'degraded': return 'text-yellow-600 bg-yellow-100';
+        case 'down': return 'text-red-600 bg-red-100';
+        default: return 'text-gray-600 bg-gray-100';
+    }
+}
+
+function getStatusIcon(status) {
+    switch(status) {
+        case 'healthy':
+            return `<div class="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                        <svg class="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                    </div>`;
+        case 'down':
+            return `<div class="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+                        <svg class="h-5 w-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                        </svg>
+                    </div>`;
+        default:
+            return `<div class="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center">
+                        <svg class="h-5 w-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path>
+                        </svg>
+                    </div>`;
+    }
+}
+
+function formatNumber(num) {
+    if (num > 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num > 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
+}
+</script>
 {% endblock %}
