@@ -202,6 +202,39 @@ let natsMetrics = {};
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
+    // Set up socket event handlers first
+    if (typeof socket !== 'undefined') {
+        socket.on('services:status:response', function(data) {
+            console.log('Received service status:', data);
+            if (data.success) {
+                serviceStatus = data.status;
+                updateServiceDisplay();
+            }
+        });
+        
+        socket.on('services:nats:monitor:response', function(data) {
+            console.log('Received NATS metrics:', data);
+            if (data.success) {
+                natsMetrics = data.metrics;
+                updateNatsMonitoring();
+            }
+        });
+        
+        // Handle individual service status updates
+        socket.on('services:status:update', function(data) {
+            console.log('Service status update:', data);
+            if (data.serviceId && data.status) {
+                // Update specific service status
+                serviceStatus[data.serviceId] = data.status;
+                updateServiceDisplay();
+            } else if (data.requestId && data.status) {
+                // Update all services from finalized status
+                serviceStatus = data.status;
+                updateServiceDisplay();
+            }
+        });
+    }
+    
     // Wait for socket to be initialized from base.html
     let retryCount = 0;
     const maxRetries = 10;
@@ -248,48 +281,6 @@ function checkAllServices() {
     socket.emit('services:nats:monitor');
 }
 
-// Socket event handlers - set up only when socket is available
-function setupSocketHandlers() {
-    if (typeof socket === 'undefined') {
-        console.warn('Socket not available for event handlers');
-        return;
-    }
-    
-    socket.on('services:status:response', function(data) {
-        console.log('Received service status:', data);
-        if (data.success) {
-            serviceStatus = data.status;
-            updateServiceDisplay();
-        }
-    });
-    
-    socket.on('services:nats:monitor:response', function(data) {
-        console.log('Received NATS metrics:', data);
-        if (data.success) {
-            natsMetrics = data.metrics;
-            updateNatsMonitoring();
-        }
-    });
-    
-    // Handle individual service status updates
-    socket.on('services:status:update', function(data) {
-        console.log('Service status update:', data);
-        if (data.serviceId && data.status) {
-            // Update specific service status
-            serviceStatus[data.serviceId] = data.status;
-            updateServiceDisplay();
-        } else if (data.requestId && data.status) {
-            // Update all services from finalized status
-            serviceStatus = data.status;
-            updateServiceDisplay();
-        }
-    });
-}
-
-// Call setup when document is ready
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(setupSocketHandlers, 1000);
-});
 
 function updateServiceDisplay() {
     // Update frontend services
