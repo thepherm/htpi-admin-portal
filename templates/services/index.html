@@ -218,6 +218,19 @@ socket.on('services:nats:monitor:response', function(data) {
     }
 });
 
+// Handle individual service status updates
+socket.on('services:status:update', function(data) {
+    if (data.serviceId && data.status) {
+        // Update specific service status
+        serviceStatus[data.serviceId] = data.status;
+        updateServiceDisplay();
+    } else if (data.requestId && data.status) {
+        // Update all services from finalized status
+        serviceStatus = data.status;
+        updateServiceDisplay();
+    }
+});
+
 function updateServiceDisplay() {
     // Update frontend services
     updateServiceGroup('frontend-services', services.frontend);

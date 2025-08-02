@@ -1306,7 +1306,7 @@ def handle_tenant_switch(data):
 # Service monitoring handlers
 @socketio.on('services:status:check')
 def handle_service_status_check():
-    """Check status of all services"""
+    """Check status of all services via NATS"""
     client_id = request.sid
     client = connected_clients.get(client_id)
     
@@ -1315,85 +1315,121 @@ def handle_service_status_check():
         return
     
     try:
-        import requests
-        import concurrent.futures
+        # List of services to check
+        services_to_check = [
+            'htpi-admin-portal',
+            'htpi-customer-portal', 
+            'htpi-gateway-service',
+            'htpi-admin-service',
+            'htpi-auth-service',
+            'htpi-tenant-service',
+            'htpi-patients-service',
+            'htpi-insurance-service',
+            'htpi-dashboard-service',
+            'htpi-encounters-service',
+            'htpi-mongodb-service',
+            'htpi-nats'
+        ]
         
         service_status = {}
         
-        # Service endpoints to check
-        services = [
-            {'id': 'htpi-admin-portal', 'url': 'http://localhost:5001/health', 'type': 'portal'},
-            {'id': 'htpi-customer-portal', 'url': 'http://localhost:5000/health', 'type': 'portal'},
-            {'id': 'htpi-gateway-service', 'url': 'http://localhost:8000/health', 'type': 'gateway'},
-            {'id': 'htpi-admin-service', 'url': 'http://localhost:8001/health', 'type': 'service'},
-            {'id': 'htpi-auth-service', 'url': 'http://localhost:8002/health', 'type': 'service'},
-            {'id': 'htpi-tenant-service', 'url': 'http://localhost:8003/health', 'type': 'service'},
-            {'id': 'htpi-patients-service', 'url': 'http://localhost:8004/health', 'type': 'service'},
-            {'id': 'htpi-insurance-service', 'url': 'http://localhost:8005/health', 'type': 'service'},
-            {'id': 'htpi-dashboard-service', 'url': 'http://localhost:8006/health', 'type': 'service'},
-            {'id': 'htpi-encounters-service', 'url': 'http://localhost:8007/health', 'type': 'service'},
-            {'id': 'htpi-mongodb-service', 'url': 'http://localhost:8008/health', 'type': 'service'},
-            {'id': 'htpi-nats', 'url': 'http://localhost:8222/varz', 'type': 'infrastructure'}
-        ]
-        
-        def check_service(service):
-            try:
-                if STANDALONE_MODE:
-                    # Mock healthy status in standalone mode
-                    return {
-                        'id': service['id'],
-                        'status': 'healthy',
-                        'message': 'Mock status - standalone mode',
+        if STANDALONE_MODE or not nc or not nc.is_connected:
+            # Mock status when NATS not available
+            for service_id in services_to_check:
+                service_status[service_id] = {
+                    'id': service_id,
+                    'status': 'healthy' if service_id in ['htpi-admin-portal', 'htpi-gateway-service', 'htpi-auth-service'] else 'down',
+                    'message': 'Mock status - NATS not connected',
+                    'lastChecked': datetime.utcnow().isoformat()
+                }
+        else:
+            # Send health check request via NATS to each service
+            health_check_request = {
+                'requestId': str(uuid.uuid4()),
+                'clientId': client_id,
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            
+            # Publish health check requests
+            for service_id in services_to_check:
+                subject = f"htpi.health.{service_id.replace('-', '.')}"
+                
+                # For NATS itself, check differently
+                if service_id == 'htpi-nats':
+                    service_status[service_id] = {
+                        'id': service_id,
+                        'status': 'healthy' if nc.is_connected else 'down',
+                        'message': 'NATS Server' if nc.is_connected else 'Not connected',
                         'lastChecked': datetime.utcnow().isoformat()
                     }
-                    
-                # In production, use Railway internal URLs
-                if os.environ.get('ENV') == 'production':
-                    service['url'] = service['url'].replace('localhost', f"{service['id']}.railway.internal")
-                
-                response = requests.get(service['url'], timeout=5)
-                status = 'healthy' if response.status_code == 200 else 'down'
-                message = 'Service operational' if status == 'healthy' else f'HTTP {response.status_code}'
-                
-                return {
-                    'id': service['id'],
-                    'status': status,
-                    'message': message,
-                    'lastChecked': datetime.utcnow().isoformat()
-                }
-            except requests.exceptions.ConnectionError:
-                return {
-                    'id': service['id'],
-                    'status': 'down',
-                    'message': 'Service unavailable',
-                    'lastChecked': datetime.utcnow().isoformat()
-                }
-            except Exception as e:
-                return {
-                    'id': service['id'],
-                    'status': 'unknown',
-                    'message': str(e),
-                    'lastChecked': datetime.utcnow().isoformat()
-                }
-        
-        # Check services in parallel
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            results = executor.map(check_service, services)
-            
-        for result in results:
-            service_status[result['id']] = result
+                else:
+                    # Send health check request
+                    if publish_to_nats(subject, health_check_request):
+                        # Store as pending
+                        service_status[service_id] = {
+                            'id': service_id,
+                            'status': 'checking',
+                            'message': 'Health check sent',
+                            'lastChecked': datetime.utcnow().isoformat()
+                        }
+                    else:
+                        service_status[service_id] = {
+                            'id': service_id,
+                            'status': 'unknown',
+                            'message': 'Failed to send health check',
+                            'lastChecked': datetime.utcnow().isoformat()
+                        }
         
         # Special handling for MongoDB
         service_status['mongodb'] = {
-            'status': 'healthy' if service_status.get('htpi-mongodb-service', {}).get('status') == 'healthy' else 'down',
-            'message': 'Database operational' if service_status.get('htpi-mongodb-service', {}).get('status') == 'healthy' else 'Database unavailable',
+            'status': 'healthy' if service_status.get('htpi-mongodb-service', {}).get('status') in ['healthy', 'checking'] else 'down',
+            'message': 'Database operational',
             'lastChecked': datetime.utcnow().isoformat()
+        }
+        
+        # Store health check request ID for tracking responses
+        if 'health_checks' not in connected_clients[client_id]:
+            connected_clients[client_id]['health_checks'] = {}
+        connected_clients[client_id]['health_checks'][health_check_request['requestId']] = {
+            'status': service_status,
+            'pending': len([s for s in service_status.values() if s.get('status') == 'checking']),
+            'timestamp': datetime.utcnow()
         }
         
         emit('services:status:response', {
             'success': True,
-            'status': service_status
+            'status': service_status,
+            'requestId': health_check_request['requestId']
         })
+        
+        # Set timeout to finalize status after 5 seconds
+        def finalize_health_status():
+            try:
+                if client_id in connected_clients and health_check_request['requestId'] in connected_clients[client_id].get('health_checks', {}):
+                    current_status = connected_clients[client_id]['health_checks'][health_check_request['requestId']]['status']
+                    
+                    # Mark any still-checking services as down
+                    for service_id, status in current_status.items():
+                        if status.get('status') == 'checking':
+                            status['status'] = 'down'
+                            status['message'] = 'No response received'
+                    
+                    # Emit final status
+                    socketio.emit('services:status:update', {
+                        'requestId': health_check_request['requestId'],
+                        'status': current_status
+                    }, room=client_id)
+                    
+                    # Clean up
+                    del connected_clients[client_id]['health_checks'][health_check_request['requestId']]
+                    
+            except Exception as e:
+                logger.error(f"Error finalizing health status: {str(e)}")
+        
+        # Schedule finalization
+        from threading import Timer
+        timer = Timer(5.0, finalize_health_status)
+        timer.start()
         
     except Exception as e:
         logger.error(f"Error checking service status: {str(e)}")
@@ -1568,6 +1604,42 @@ async def handle_claims_response(msg):
     except Exception as e:
         logger.error(f"Error handling claims response: {str(e)}")
 
+async def handle_health_response(msg):
+    """Handle health check responses from services"""
+    try:
+        data = json.loads(msg.data.decode())
+        service_id = data.get('serviceId')
+        request_id = data.get('requestId')
+        client_id = data.get('clientId')
+        
+        # Find the client and update their health check status
+        if client_id in connected_clients:
+            health_checks = connected_clients[client_id].get('health_checks', {})
+            
+            if request_id in health_checks:
+                # Update service status
+                if service_id in health_checks[request_id]['status']:
+                    health_checks[request_id]['status'][service_id] = {
+                        'id': service_id,
+                        'status': data.get('status', 'healthy'),
+                        'message': data.get('message', 'Service operational'),
+                        'version': data.get('version', 'unknown'),
+                        'uptime': data.get('uptime', 'unknown'),
+                        'lastChecked': datetime.utcnow().isoformat()
+                    }
+                    
+                    # Emit update to client
+                    socketio.emit('services:status:update', {
+                        'requestId': request_id,
+                        'serviceId': service_id,
+                        'status': health_checks[request_id]['status'][service_id]
+                    }, room=client_id)
+                    
+        logger.info(f"Received health response from {service_id}")
+        
+    except Exception as e:
+        logger.error(f"Error handling health response: {str(e)}")
+
 # Initialize NATS connection
 async def init_nats():
     """Initialize NATS connection and subscriptions"""
@@ -1582,6 +1654,9 @@ async def init_nats():
         await nc.subscribe("admin.insurance.response.*", cb=handle_insurance_response)
         await nc.subscribe("admin.claims.response.*", cb=handle_claims_response)
         await nc.subscribe("admin.tenants.updates", cb=handle_tenant_update)
+        
+        # Subscribe to health check responses
+        await nc.subscribe("admin.health.response.*", cb=handle_health_response)
         
         # Subscribe to broadcast channels
         await nc.subscribe("admin.broadcast.patients.*", cb=handle_patient_response)
