@@ -27,7 +27,7 @@ class NATSService:
         self.app = app
         self.nats_url = app.config.get('NATS_URL', 'nats://localhost:4222')
         self.nats_user = app.config.get('NATS_USER', 'admin')
-        self.nats_password = app.config.get('NATS_PASSWORD', 'htpi_nats_dev')
+        self.nats_password = app.config.get('NATS_PASS', 'htpi_nats_dev')
         
     def connect(self):
         """Connect to NATS server"""

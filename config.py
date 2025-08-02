@@ -24,7 +24,7 @@ class Config:
     # NATS Configuration
     NATS_URL = os.environ.get('NATS_URL', 'nats://localhost:4222')
     NATS_USER = os.environ.get('NATS_USER', 'admin')
-    NATS_PASSWORD = os.environ.get('NATS_PASSWORD', 'htpi_nats_dev')
+    NATS_PASS = os.environ.get('NATS_PASS', 'htpi_nats_dev')
     
     # Application settings
     ITEMS_PER_PAGE = 20
