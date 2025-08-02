@@ -37,10 +37,18 @@ socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=
 
 # NATS configuration
 NATS_URL = os.environ.get('NATS_URL', 'nats://localhost:4222')
+STANDALONE_MODE = os.environ.get('STANDALONE_MODE', 'true').lower() == 'true'
 nc = None  # NATS client will be initialized on startup
 
 # Connected clients tracking
 connected_clients = {}
+
+# Log startup mode
+if STANDALONE_MODE:
+    logger.warning("Running in STANDALONE MODE - No NATS/microservices required")
+    logger.warning("Set STANDALONE_MODE=false when NATS and services are deployed")
+else:
+    logger.info("Running in MICROSERVICES MODE - Connecting to NATS")
 
 # NATS subjects mapping
 NATS_SUBJECTS = {
@@ -622,7 +630,7 @@ def handle_add_claimmd(data):
 
 @socketio.on('admin:patients:subscribe')
 def handle_patients_subscribe(data):
-    """Subscribe to patient updates - forward to NATS"""
+    """Subscribe to patient updates - forward to NATS or use standalone mode"""
     client_id = request.sid
     client = connected_clients.get(client_id)
     tenant_id = data.get('tenantId')
@@ -636,23 +644,63 @@ def handle_patients_subscribe(data):
         room = f"admin:patients:{tenant_id}"
         join_room(room)
         
-        # Publish to NATS to get patient list
-        nats_message = {
-            'tenantId': tenant_id,
-            'userId': client['user']['id'],
-            'requestType': 'subscribe',
-            'responseChannel': f"admin.patients.response.{client_id}"
-        }
-        
-        # In production, this publishes to NATS and patient service responds
-        result = publish_to_nats('patient.list', nats_message)
-        
-        if result:
-            # Forward NATS response to client
-            emit('admin:patients:list', result)
+        if STANDALONE_MODE:
+            # Standalone mode - return mock data
+            mock_patients = [
+                {
+                    'id': 'pat-001',
+                    'patientId': 'P001234',
+                    'firstName': 'John',
+                    'lastName': 'Doe',
+                    'dateOfBirth': '1985-03-15',
+                    'gender': 'M',
+                    'ssn': 'XXX-XX-1234',
+                    'phone': '(555) 123-4567',
+                    'email': 'john.doe@email.com',
+                    'address': '123 Main St',
+                    'city': 'Springfield',
+                    'state': 'IL',
+                    'zipCode': '62701',
+                    'insuranceCount': 2,
+                    'tenantId': tenant_id
+                },
+                {
+                    'id': 'pat-002',
+                    'patientId': 'P001235',
+                    'firstName': 'Jane',
+                    'lastName': 'Smith',
+                    'dateOfBirth': '1990-07-22',
+                    'gender': 'F',
+                    'ssn': 'XXX-XX-5678',
+                    'phone': '(555) 987-6543',
+                    'email': 'jane.smith@email.com',
+                    'address': '456 Oak Ave',
+                    'city': 'Springfield',
+                    'state': 'IL',
+                    'zipCode': '62702',
+                    'insuranceCount': 1,
+                    'tenantId': tenant_id
+                }
+            ]
+            
+            emit('admin:patients:list', {'patients': mock_patients})
+            logger.info(f"[STANDALONE] Admin subscribed to patients for tenant {tenant_id}")
+            
         else:
-            # NATS not available - send error
-            emit('admin:patients:list', {'patients': [], 'error': 'Service temporarily unavailable'})
+            # Production mode - use NATS
+            nats_message = {
+                'tenantId': tenant_id,
+                'userId': client['user']['id'],
+                'requestType': 'subscribe',
+                'responseChannel': f"admin.patients.response.{client_id}"
+            }
+            
+            result = publish_to_nats('patient.list', nats_message)
+            
+            if result:
+                emit('admin:patients:list', result)
+            else:
+                emit('admin:patients:list', {'patients': [], 'error': 'Service temporarily unavailable'})
         
         logger.info(f"Admin {client['user']['id']} subscribed to patients for tenant {tenant_id}")
         
@@ -662,7 +710,7 @@ def handle_patients_subscribe(data):
 
 @socketio.on('admin:patients:create')
 def handle_create_patient(data):
-    """Forward patient creation request to NATS"""
+    """Forward patient creation request to NATS or handle in standalone mode"""
     client_id = request.sid
     client = connected_clients.get(client_id)
     
@@ -671,40 +719,59 @@ def handle_create_patient(data):
         return
     
     try:
-        # Add context to the request
-        nats_message = {
-            **data,
-            'createdBy': client['user']['id'],
-            'createdByName': client['user']['name'],
-            'requestId': data.get('requestId'),
-            'timestamp': datetime.utcnow().isoformat()
-        }
-        
-        if nc and nc.is_connected:
-            # Publish to NATS for patient service to handle
-            # The patient service will:
-            # 1. Generate patient ID
-            # 2. Validate data
-            # 3. Save to MongoDB via mongodb service
-            # 4. Publish response back
+        if STANDALONE_MODE:
+            # Standalone mode - create mock patient
+            import random
+            patient_id = f"P{str(random.randint(100000, 999999))}"
             
-            # This is synchronous for now, should be async in production
-            logger.info(f"Publishing patient.create to NATS: {nats_message}")
+            new_patient = {
+                'id': f"pat-{random.randint(1000, 9999)}",
+                'patientId': patient_id,
+                **data,
+                'insuranceCount': 0,
+                'createdBy': client['user']['id'],
+                'createdAt': datetime.utcnow().isoformat()
+            }
             
-            # Mock NATS not available in sync mode
+            # Send success response
             emit(f"admin:patients:create:response:{data.get('requestId')}", {
-                'success': False,
-                'error': 'NATS service temporarily unavailable'
+                'success': True,
+                'patient': new_patient
             })
+            
+            # Broadcast to all admins watching this tenant
+            socketio.emit('admin:patients:created', new_patient, 
+                        room=f"admin:patients:{data['tenantId']}")
+            
+            logger.info(f"[STANDALONE] Patient created: {patient_id}")
+            
         else:
-            # NATS not connected
-            emit(f"admin:patients:create:response:{data.get('requestId')}", {
-                'success': False,
-                'error': 'Message broker offline'
-            })
+            # Production mode - forward to NATS
+            nats_message = {
+                **data,
+                'createdBy': client['user']['id'],
+                'createdByName': client['user']['name'],
+                'requestId': data.get('requestId'),
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            
+            if nc and nc.is_connected:
+                logger.info(f"Publishing patient.create to NATS: {nats_message}")
+                result = publish_to_nats('patient.create', nats_message)
+                
+                if not result:
+                    emit(f"admin:patients:create:response:{data.get('requestId')}", {
+                        'success': False,
+                        'error': 'Service temporarily unavailable'
+                    })
+            else:
+                emit(f"admin:patients:create:response:{data.get('requestId')}", {
+                    'success': False,
+                    'error': 'Message broker offline'
+                })
         
     except Exception as e:
-        logger.error(f"Error forwarding patient create request: {str(e)}")
+        logger.error(f"Error in patient create: {str(e)}")
         emit(f"admin:patients:create:response:{data.get('requestId')}", {
             'success': False,
             'error': 'Failed to process request'
@@ -1333,16 +1400,20 @@ def server_error(error):
     return render_template('500.html'), 500
 
 if __name__ == '__main__':
-    # Run NATS initialization in event loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        loop.run_until_complete(init_nats())
-    except Exception as e:
-        logger.error(f"NATS initialization failed: {str(e)}")
-        logger.warning("Starting without NATS connection")
+    # Only initialize NATS if not in standalone mode
+    if not STANDALONE_MODE:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(init_nats())
+        except Exception as e:
+            logger.error(f"NATS initialization failed: {str(e)}")
+            logger.warning("Starting without NATS connection")
+    else:
+        logger.info("Skipping NATS initialization in STANDALONE MODE")
     
     # Start Flask-SocketIO server
     port = int(os.environ.get('PORT', 5001))
+    logger.info(f"Starting admin portal on port {port}")
     socketio.run(app, host='0.0.0.0', port=port, 
                  debug=os.environ.get('ENV') != 'production')
