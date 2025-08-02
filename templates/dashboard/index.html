@@ -1,12 +1,10 @@
-{% extends "base.html" %}
+{% extends "layout.html" %}
 
 {% block title %}Dashboard - HTPI Admin Portal{% endblock %}
 
-{% block content %}
-<div class="mb-8">
-    <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
-    <p class="mt-1 text-sm text-gray-600">Overview of your healthcare platform</p>
-</div>
+{% block page_title %}Dashboard{% endblock %}
+
+{% block page_content %}
 
 <!-- Stats Grid -->
 <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">

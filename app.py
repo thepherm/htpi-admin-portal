@@ -143,6 +143,43 @@ def services():
                          user=session.get('user'),
                          services=mock_services)
 
+@app.route('/patients')
+@login_required
+def patients():
+    return render_template('patients/index.html',
+                         user=session.get('user'))
+
+@app.route('/patients/<patient_id>')
+@login_required
+def patient_detail(patient_id):
+    return render_template('patients/detail.html',
+                         user=session.get('user'),
+                         patient_id=patient_id)
+
+@app.route('/insurance')
+@login_required
+def insurance():
+    return render_template('insurance/index.html',
+                         user=session.get('user'))
+
+@app.route('/claims')
+@login_required
+def claims():
+    return render_template('claims/index.html',
+                         user=session.get('user'))
+
+@app.route('/encounters')
+@login_required
+def encounters():
+    return render_template('encounters/index.html',
+                         user=session.get('user'))
+
+@app.route('/tenants/switch')
+@login_required
+def switch_tenant():
+    return render_template('tenants/switch.html',
+                         user=session.get('user'))
+
 # Session management endpoint
 @app.route('/auth/session', methods=['POST'])
 def set_session():
@@ -517,6 +554,112 @@ def handle_add_claimmd(data):
         emit(f"admin:tenant:claimmd:add:response:{data.get('requestId')}", {
             'success': False,
             'error': 'Failed to add ClaimMD account'
+        })
+
+@socketio.on('admin:patients:subscribe')
+def handle_patients_subscribe(data):
+    """Subscribe to patient updates"""
+    client_id = request.sid
+    client = connected_clients.get(client_id)
+    tenant_id = data.get('tenantId')
+    
+    if not client or not client.get('authenticated') or client.get('role') != 'admin':
+        emit('error', {'message': 'Admin access required'})
+        return
+    
+    try:
+        # Join patients room
+        room = f"admin:patients:{tenant_id}"
+        join_room(room)
+        
+        # Send mock patient data for development
+        mock_patients = [
+            {
+                'id': 'pat-001',
+                'patientId': 'P001234',
+                'firstName': 'John',
+                'lastName': 'Doe',
+                'dateOfBirth': '1985-03-15',
+                'gender': 'M',
+                'ssn': 'XXX-XX-1234',
+                'phone': '(555) 123-4567',
+                'email': 'john.doe@email.com',
+                'address': '123 Main St',
+                'city': 'Springfield',
+                'state': 'IL',
+                'zipCode': '62701',
+                'insuranceCount': 2,
+                'tenantId': tenant_id
+            },
+            {
+                'id': 'pat-002',
+                'patientId': 'P001235',
+                'firstName': 'Jane',
+                'lastName': 'Smith',
+                'dateOfBirth': '1990-07-22',
+                'gender': 'F',
+                'ssn': 'XXX-XX-5678',
+                'phone': '(555) 987-6543',
+                'email': 'jane.smith@email.com',
+                'address': '456 Oak Ave',
+                'city': 'Springfield',
+                'state': 'IL',
+                'zipCode': '62702',
+                'insuranceCount': 1,
+                'tenantId': tenant_id
+            }
+        ]
+        
+        emit('admin:patients:list', {'patients': mock_patients})
+        logger.info(f"Admin subscribed to patients for tenant {tenant_id}")
+        
+    except Exception as e:
+        logger.error(f"Error subscribing to patients: {str(e)}")
+        emit('error', {'message': 'Failed to load patients'})
+
+@socketio.on('admin:patients:create')
+def handle_create_patient(data):
+    """Create a new patient"""
+    client_id = request.sid
+    client = connected_clients.get(client_id)
+    
+    if not client or not client.get('authenticated') or client.get('role') != 'admin':
+        emit('error', {'message': 'Admin access required'})
+        return
+    
+    try:
+        # Generate patient ID
+        import random
+        patient_id = f"P{str(random.randint(100000, 999999))}"
+        
+        # Create patient object
+        new_patient = {
+            'id': f"pat-{random.randint(1000, 9999)}",
+            'patientId': patient_id,
+            **data,
+            'insuranceCount': 0,
+            'createdBy': client['user']['id'],
+            'createdAt': '2024-03-15T10:00:00Z'
+        }
+        
+        # In production, this would be sent to NATS
+        # For now, broadcast to admins watching this tenant
+        socketio.emit('admin:patients:created', new_patient, 
+                    room=f"admin:patients:{data['tenantId']}")
+        
+        # Send success response
+        emit(f"admin:patients:create:response:{data.get('requestId')}", {
+            'success': True,
+            'patient': new_patient
+        })
+        
+        logger.info(f"Patient created: {patient_id}")
+        
+    except Exception as e:
+        logger.error(f"Error creating patient: {str(e)}")
+        emit(f"admin:patients:create:response:{data.get('requestId')}", {
+            'success': False,
+            'error': 'Failed to create patient'
         })
 
 # NATS message handlers for admin updates
